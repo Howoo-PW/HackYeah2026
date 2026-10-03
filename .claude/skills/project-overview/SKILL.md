@@ -51,8 +51,14 @@ Stan opisuje bieżący branch; nie oznaczaj cudzych zmian jako scalonych.
 - Branch opublikowany, draft PR #2, GitHub Actions PASS. Main chroniony: PR,
   1 akceptacja, checki backend/ai/frontend i zakaz force-push/usunięcia (także admin).
 
+- 2026-10-05: własny graf tras (db/routing-graph, w main) i POST /route dla auta i roweru na grafie
+  (backend/graph-routing). Piesi nadal przez ORS/mock.
+
 ## TODO
 
+- Piesi: graf pieszy (B2 dane, backend), potem usunięcie mocka; przeszkody/pora dnia w koszcie;
+  frontend/routing: wybór A→B, suwaki wag, lokalizacja użytkownika jako start (FE); instrukcja
+  podłączenia dla FE jest w skillu frontend, sekcja „Trasy: co podłączyć”.
 - backend/b1-howoo: sekrety DB/service_role i test rzeczywistego JWT/zapisów odroczone
   na prośbę użytkownika. Kontenery demo działają; DB health=503 bez konfiguracji.
 - db/seed-krakow (B2): seed Krakowa i weryfikacja harmonogramu segment_stats.

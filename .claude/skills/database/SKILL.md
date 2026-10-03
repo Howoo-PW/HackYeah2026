@@ -27,8 +27,15 @@ Stan i TODO tutaj oraz w overview i dziennik B2. Nie edytuj kontraktu przy okazj
 - B1 nie dodaje ani nie stosuje migracji; DB pozostaje własnością B2.
 - Sześć migracji B2 z origin/main (93d01d9) jest już w tym branchu.
 
+- 2026-10-05, db/routing-graph: graf tras w bazie (`routing_edges/nodes`, `routing_graph`,
+  `find_route`, `rebuild_routing`), koszt z wag użytkownika; opis w docs/ROUTING_GRAPH.md.
+  Auto 96,5%, rower 96,2% w największej silnie spójnej składowej. `routing_snap` (2026-10-05):
+  najbliższy węzeł i odległość, używane przez backend do odrzucania punktów > 600 m od drogi.
+
 ## TODO
 
+- Graf: przeszkody w koszcie, pora dnia, parkingi przy celu, trasy alternatywne; integracja
+  `POST /route` z `find_route` (backend, AI/B1). Po reimporcie OSM: `select * from rebuild_routing();`.
 - db/schema: migracje scalone; dalsza weryfikacja uprawnień i harmonogramów u B2.
 - db/seed-krakow: import OSM, podział odcinków <=300 m, parkingi i dane demo.
 - Harmonogram odświeżania segment_stats; pgRouting dopiero gdy używany.

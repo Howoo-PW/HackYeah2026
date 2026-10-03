@@ -21,9 +21,13 @@ class Weights(BaseModel):
     parking: int = Field(default=0, ge=0, le=3)
 
 
+MAX_VIA = 5  # intermediate stops; every leg is a separate search, so the number is bounded
+
+
 class RouteRequest(BaseModel):
     from_: Point = Field(alias="from")
     to: Point
+    via: list[Point] = Field(default_factory=list, max_length=MAX_VIA)  # stops between from and to, in order
     profile: Profile = "driving-car"
     weights: Weights = Weights()
 

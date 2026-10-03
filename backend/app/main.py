@@ -80,17 +80,28 @@ def _check_database() -> str:
 
 
 def _check_routing() -> str:
-    """No call to ORS here: the free plan has a daily quota and /health is polled."""
+    """Own graph (cars, bikes) must be built; pedestrians need ORS configured. No call to ORS here: free plan quota."""
+    pool = app.state.db_pool
+    if pool is None:
+        return "not_configured"
+    try:
+        with pool.connection() as conn:
+            row = conn.execute("SELECT EXISTS(SELECT 1 FROM public.routing_graph) AS ready").fetchone()
+    except Exception:
+        return "error"
+    if not row["ready"]:
+        return "error"
     if settings.routing_provider == "ors":
         return "ok" if settings.ors_api_key.get_secret_value() else "not_configured"
-    return "ok"  # mock provider
+    return "ok"  # mock provider for pedestrians
 
 
 @api.get("/health", tags=["system"])
 async def health():
     """Service health in the contract format (docs/CONTRACT.md, section 5.1)."""
-    database, ai = await asyncio.gather(asyncio.to_thread(_check_database), _check_ai())
-    checks = {"database": database, "ai_service": ai, "routing": _check_routing()}
+    database, ai, routing = await asyncio.gather(
+        asyncio.to_thread(_check_database), _check_ai(), asyncio.to_thread(_check_routing))
+    checks = {"database": database, "ai_service": ai, "routing": routing}
     status = "down" if database != "ok" else ("ok" if all(v == "ok" for v in checks.values()) else "degraded")
     return JSONResponse({"status": status, "version": VERSION, "checks": checks}, status_code=503 if status == "down" else 200)
 
