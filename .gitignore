@@ -30,3 +30,6 @@ Thumbs.db
 
 # Cache Overpass (import_osm.py)
 scripts/.cache/
+
+# Pobrane dane OSM (cache skryptow)
+data/

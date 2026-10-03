@@ -11,7 +11,7 @@ from .database import get_repository
 from .errors import AppError
 from .geo import parse_bbox, validate_point
 from .schemas import (Comment, CommentCreate, CommentPage, ContentUpdate, Dimension,
-                      FeatureCollection, NearestSegment, Profile, Rating, RatingCreate, SegmentDetail)
+                      FeatureCollection, GroupDetail, NearestSegment, Profile, Rating, RatingCreate, SegmentDetail)
 
 router = APIRouter()
 RepositoryDep = Annotated[object, Depends(get_repository, scope="function")]
@@ -39,6 +39,12 @@ def nearest(repo: RepositoryDep, lat: float, lon: float):
     """Find the closest road no more than 50 metres from a Krakow location."""
     validate_point(lat, lon)
     return repo.nearest(lat, lon)
+
+
+@router.get("/groups/{group_id}", response_model=GroupDetail, tags=["segments"])
+def group(group_id: SegmentId, repo: RepositoryDep):
+    """Return a street stretch (group of segments) with merged geometry and group scores."""
+    return repo.group(group_id)
 
 
 @router.get("/segments/{segment_id}", response_model=SegmentDetail, tags=["segments"])
