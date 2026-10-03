@@ -1,0 +1,28 @@
+# Sekrety
+.env
+.env.*
+!.env.example
+
+# Claude Code — ustawienia osobiste
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+
+# Dane tymczasowe
+*.osm.pbf
+*.log
+
+# System / IDE
+.DS_Store
+Thumbs.db
+.idea/
