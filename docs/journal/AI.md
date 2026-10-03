@@ -4,6 +4,24 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+## 2026-10-04 — prukasz — gałąź `ai/llm-openrouter`
+
+**Zadanie:** pierwsze prawdziwe wywołanie LLM w serwisie AI (dotąd tylko mock).
+
+**Zrobione:**
+- model: `stealth/space-bunny-alpha` przez OpenRouter (API zgodne z OpenAI, darmowy podgląd), konfiguracja tylko w `.env`
+- odkryte w teście: domyślne `with_structured_output` nie działa (model zwraca własne klucze albo markdown, 0/3 poprawnych), a pojedyncza odpowiedź trwała 7–21 s
+- poprawka: `AI_STRUCTURED_METHOD=json_mode` (schemat opisany w prompcie, `schema_hint`) i `AI_REASONING_EFFORT=low`: 3/3 poprawnych, ok. 4–5 s (limit w kontrakcie to 15 s)
+- sprawdzone przez HTTP na kontenerze: polecenie wstrzyknięte w komentarzu zostało zignorowane
+- 4 nowe testy konfiguracji (bez sieci), razem 14
+
+**Dalej / blokery:**
+- jakość: model dopisuje wnioski spoza komentarzy (np. `safety` z samych dziur) i wpisuje do `conflicts` różnice pory dnia, które nie są sprzecznością; do dopracowania w prompcie
+- `/analyze-surface` (zdjęcia) nieprzetestowane na prawdziwym modelu
+- stealth = anonimowy dostawca, możliwe logowanie zapytań i zniknięcie modelu; zapasowy model to zmiana 3 linijek w `.env`
+- klucz OpenRouter trafił do rozmowy: zalecana rotacja po hackathonie
+
+
 ## 2026-10-04 — prukasz — gałąź `backend/segment-groups`
 
 **Zadanie:** połączyć krótkie odcinki w grupy ocenialne przez użytkownika i dać każdemu odcinkowi wynik także wtedy, gdy ocenili tylko sąsiadów.
