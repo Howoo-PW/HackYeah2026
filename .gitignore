@@ -27,3 +27,6 @@ dist/
 Thumbs.db
 .idea/
 .claude/role.local.json
+
+# Cache Overpass (import_osm.py)
+scripts/.cache/
