@@ -1,5 +1,6 @@
 """Route sources: OpenRouteService (real) and a deterministic mock for work without an API key."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -20,20 +21,22 @@ class RawRoute:
 
 
 class RouteProvider(Protocol):
-    async def routes(self, start: Point, end: Point, profile: Profile) -> list[RawRoute]: ...
+    async def routes(self, start: Point, end: Point, profile: Profile, via: Sequence[Point] = ()) -> list[RawRoute]: ...
 
 
 class OrsProvider:
-    """OpenRouteService directions. Asks for up to 3 alternatives (ORS allows them for routes < 100 km)."""
+    """OpenRouteService directions. Asks for up to 3 alternatives (ORS allows them for routes < 100 km).
+
+    ORS gives alternatives only for a route with exactly two coordinates, so a route with `via` stops is one route.
+    """
 
     def __init__(self, api_key: str, base_url: str, client: httpx.AsyncClient | None = None):
         self._api_key, self._base_url, self._client = api_key, base_url.rstrip("/"), client
 
-    async def routes(self, start: Point, end: Point, profile: Profile) -> list[RawRoute]:
-        body = {
-            "coordinates": [[start.lon, start.lat], [end.lon, end.lat]],
-            "alternative_routes": {"target_count": 3, "share_factor": 0.6, "weight_factor": 1.6},
-        }
+    async def routes(self, start: Point, end: Point, profile: Profile, via: Sequence[Point] = ()) -> list[RawRoute]:
+        body: dict = {"coordinates": [[p.lon, p.lat] for p in (start, *via, end)]}
+        if not via:
+            body["alternative_routes"] = {"target_count": 3, "share_factor": 0.6, "weight_factor": 1.6}
         headers = {"Authorization": self._api_key, "User-Agent": settings.user_agent}
         url = f"{self._base_url}/v2/directions/{profile}/geojson"
         try:
@@ -81,9 +84,16 @@ _SPEED_MS = {"driving-car": 8.3, "cycling-regular": 4.2, "foot-walking": 1.4}  #
 
 
 class MockProvider:
-    """Direct line plus a detour east and west of the midpoint (+/-0.003 deg lon). Matches data/sample_segments.geojson."""
+    """Direct line plus a detour east and west of the midpoint (+/-0.003 deg lon). Matches data/sample_segments.geojson.
 
-    async def routes(self, start: Point, end: Point, profile: Profile) -> list[RawRoute]:
+    With `via` stops: one route, a straight line through the stops in order.
+    """
+
+    async def routes(self, start: Point, end: Point, profile: Profile, via: Sequence[Point] = ()) -> list[RawRoute]:
+        if via:
+            coords = [[p.lon, p.lat] for p in (start, *via, end)]
+            length = to_meters(LineString(coords)).length
+            return [RawRoute(coords, round(length, 1), round(length / _SPEED_MS[profile], 1))]
         mid_lon, mid_lat = (start.lon + end.lon) / 2, (start.lat + end.lat) / 2
         routes = []
         for offset in (0.0, 0.003, -0.003):

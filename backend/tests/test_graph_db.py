@@ -37,8 +37,18 @@ def source():
 
 
 def test_snapping_distance(source):
-    assert source.snap_distance("cycling-regular", RYNEK) < MAX_SNAP_M
-    assert source.snap_distance("driving-car", LAS_WOLSKI) > MAX_SNAP_M
+    assert source.snap("cycling-regular", RYNEK).distance_m < MAX_SNAP_M
+    assert source.snap("driving-car", LAS_WOLSKI).distance_m > MAX_SNAP_M
+
+
+def test_route_through_a_via_stop_passes_near_it(source):
+    via = Point(lat=50.0900, lon=19.9500)
+    direct = graph_routes(source, "cycling-regular", FAR_EAST, FAR_WEST, Weights())[0]
+    detour = graph_routes(source, "cycling-regular", FAR_EAST, FAR_WEST, Weights(), via=[via])[0]
+    assert detour.distance_m > direct.distance_m  # the stop is off the direct way
+    nearest = min(((lon - via.lon) * 71_000) ** 2 + ((lat - via.lat) * 111_000) ** 2
+                  for lon, lat in detour.geometry.coordinates)
+    assert nearest ** 0.5 < MAX_SNAP_M
 
 
 @pytest.mark.parametrize("profile", ["driving-car", "cycling-regular"])
@@ -84,6 +94,16 @@ def test_endpoint_and_health_with_the_real_pool():
         assert res.status_code == 200, res.text
         routes = res.json()["routes"]
         assert routes[0]["rank"] == 1 and routes[0]["distance_m"] > 0
+
+        frontend = client.post("/api/v1/route", json={  # the request shape the frontend sends, with a via stop
+            "from": {"lat": 50.06686331811255, "lon": 19.93412799209031},
+            "to": {"lat": 50.06705043002839, "lon": 19.930265608621056},
+            "via": [{"lat": 50.06549504004241, "lon": 19.93070285958069}],
+            "profile": "driving-car",
+            "weights": {"surface": 2, "views": 0, "safety": 0, "traffic": 0, "parking": 0},
+        })
+        assert frontend.status_code == 200, frontend.text
+        assert frontend.json()["routes"][0]["rank"] == 1
 
         health = client.get("/api/v1/health").json()
         assert health["checks"]["routing"] in ("ok", "not_configured")  # not_configured: no ORS key (pedestrians)

@@ -53,15 +53,16 @@ async def route(
     client_ip = request.client.host if request.client else "unknown"
     await run_in_threadpool(request.app.state.rate_limiter.check, client_ip, "route", ROUTE_LIMIT_PER_MINUTE, 60)
 
-    for name, point in (("from", req.from_), ("to", req.to)):
+    stops = [("from", req.from_), *((f"via[{i}]", p) for i, p in enumerate(req.via)), ("to", req.to)]
+    for name, point in stops:
         if not in_krakow(point.lat, point.lon):
             raise AppError(422, "OUT_OF_AREA", "Point is outside Kraków", {"field": name})
 
     if req.profile in GRAPH_PROFILES:
-        routes = await run_in_threadpool(graph_routes, graph, req.profile, req.from_, req.to, req.weights)
+        routes = await run_in_threadpool(graph_routes, graph, req.profile, req.from_, req.to, req.weights, req.via)
         return RouteResponse(routes=routes)
 
-    raw_routes = await provider.routes(req.from_, req.to, req.profile)
+    raw_routes = await provider.routes(req.from_, req.to, req.profile, req.via)
     if not raw_routes:
         raise AppError(404, "NOT_FOUND", "No route found")
 

@@ -67,6 +67,23 @@ Dla `driving-car` i `cycling-regular` endpoint korzysta z grafu; `foot-walking` 
 - Krawędź jest dopasowana do **jednego** odcinka (najbliższego jej środka), więc na długiej krawędzi obejmującej kilka
   odcinków liczy się wynik jednego z nich.
 
+**Żądanie** (pole `via` jest opcjonalne i **nie ma go jeszcze w `docs/CONTRACT.md`**, zmiana kontraktu idzie osobnym PR):
+
+```json
+{ "from": {"lat": 50.0668, "lon": 19.9341}, "to": {"lat": 50.0670, "lon": 19.9302},
+  "via": [{"lat": 50.0654, "lon": 19.9307}],
+  "profile": "driving-car",
+  "weights": {"surface": 2, "views": 0, "safety": 0, "traffic": 0, "parking": 0} }
+```
+
+- `via`: do 5 punktów pośrednich, trasa przechodzi przez nie w podanej kolejności (start → via[0] → … → koniec).
+  Każdy odcinek między dwoma przystankami szuka się osobno, a wyniki skleja w jedną trasę. Przystanek, który wypada w tym
+  samym węźle co poprzedni, nie dodaje odcinka. Odpowiedź ma ten sam kształt co bez `via` (jedna linia, sumy
+  dystansu i czasu), więc frontend nie musi niczego zmieniać po swojej stronie.
+- Piesi z `via` dostają jedną trasę (ORS daje alternatywy tylko dla dwóch współrzędnych).
+- Błąd punktu pośredniego wskazuje jego indeks: `details.field = "via[0]"`.
+- Czas: każdy przystanek dodaje jedno wyszukiwanie na wariant (do ok. 1 s w najgorszym przypadku na darmowej bazie).
+
 Błędy: punkt dalej niż 600 m od sieci drogowej danego profilu → `404 NOT_FOUND` z `details.field` (`from`/`to`);
 brak trasy (np. ten sam punkt) → `404`; punkt poza Krakowem → `422 OUT_OF_AREA`; wagi poza 0–3 → `422`;
 limit 30 żądań na minutę na IP (kontrakt, sekcja 9) → `429 RATE_LIMITED`. Za reverse proxy wszystkie żądania mają

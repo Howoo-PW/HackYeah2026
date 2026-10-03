@@ -10,8 +10,8 @@ from fastapi.testclient import TestClient
 from app import main
 from app.errors import AppError
 from app.main import app
-from app.routing.graph import (MAX_SNAP_M, EdgeStep, PostgresGraphSource, build_route, graph_routes, step_scores,
-                               stitch)
+from app.routing.graph import (MAX_SNAP_M, EdgeStep, PostgresGraphSource, Snap, build_route, graph_routes,
+                               step_scores, stitch)
 from app.routing.router import get_graph_source
 from app.routing.schemas import Point, Weights
 
@@ -35,14 +35,15 @@ class FakeGraph:
 
     def __init__(self, weighted, fastest=None, snap=10.0):
         self.paths = [weighted] + ([fastest] if fastest is not None else [])
-        self.snap = snap
+        self.snap_m = snap
         self.calls = []
 
-    def snap_distance(self, profile, point):
-        return self.snap
+    def snap(self, profile, point):
+        # distinct points snap to distinct nodes, identical points to the same one
+        return None if self.snap_m is None else Snap(hash((point.lat, point.lon)), self.snap_m)
 
-    def find(self, profile, start, end, variants):
-        self.calls.append((profile, start, end, variants))
+    def find(self, profile, legs, variants):
+        self.calls.append((profile, legs, variants))
         return self.paths[: len(variants)]
 
 
@@ -104,14 +105,14 @@ def test_without_weights_only_the_fastest_route_is_asked_for():
     graph = FakeGraph(FAST)
     routes = graph_routes(graph, "driving-car", Point(**RYNEK), Point(**PODGORZE), Weights())
     assert [r.rank for r in routes] == [1]
-    assert graph.calls[0][3] == [Weights()]
+    assert graph.calls[0][2] == [Weights()]
 
 
 def test_with_weights_rank_1_is_the_users_route_and_rank_2_the_fastest():
     graph = FakeGraph(SCENIC, FAST)
     weights = Weights(views=3, traffic=1)
     routes = graph_routes(graph, "cycling-regular", Point(**RYNEK), Point(**PODGORZE), weights)
-    assert graph.calls[0][3] == [weights, Weights()]
+    assert graph.calls[0][2] == [weights, Weights()]
     assert [r.rank for r in routes] == [1, 2]
     assert routes[0].segment_ids == [11, 12] and routes[1].segment_ids == [13]
     assert routes[0].duration_s == 90.0 and routes[1].duration_s == 50.0
@@ -130,6 +131,39 @@ def test_point_far_from_any_road_is_not_found(snap):
         graph_routes(FakeGraph(FAST, snap=snap), "driving-car", Point(**RYNEK), Point(**PODGORZE), Weights())
     assert (err.value.status, err.value.code) == (404, "NOT_FOUND")
     assert err.value.details == {"profile": "driving-car", "field": "from"}
+
+
+VIA = Point(lat=50.0540, lon=19.9353)
+
+
+def test_via_stops_split_the_route_into_legs_in_order():
+    graph = FakeGraph(SCENIC)
+    other = Point(lat=50.0500, lon=19.9400)
+    graph_routes(graph, "driving-car", Point(**RYNEK), Point(**PODGORZE), Weights(), via=[VIA, other])
+    legs = graph.calls[0][1]
+    assert legs == [(Point(**RYNEK), VIA), (VIA, other), (other, Point(**PODGORZE))]
+
+
+def test_via_on_top_of_the_previous_stop_adds_no_leg():
+    graph = FakeGraph(SCENIC)
+    graph_routes(graph, "driving-car", Point(**RYNEK), Point(**PODGORZE), Weights(), via=[Point(**RYNEK)])
+    assert graph.calls[0][1] == [(Point(**RYNEK), Point(**PODGORZE))]
+
+
+def test_far_via_is_reported_with_its_index():
+    class FarVia(FakeGraph):
+        def snap(self, profile, point):
+            return Snap(1 if point == VIA else hash((point.lat, point.lon)), 5000.0 if point == VIA else 5.0)
+
+    with pytest.raises(AppError) as err:
+        graph_routes(FarVia(SCENIC), "driving-car", Point(**RYNEK), Point(**PODGORZE), Weights(), via=[VIA])
+    assert (err.value.status, err.value.details) == (404, {"profile": "driving-car", "field": "via[0]"})
+
+
+def test_same_start_and_destination_without_via_is_not_found():
+    with pytest.raises(AppError) as err:
+        graph_routes(FakeGraph(SCENIC), "driving-car", Point(**RYNEK), Point(**RYNEK), Weights())
+    assert err.value.status == 404
 
 
 def test_empty_path_is_not_found():
@@ -156,6 +190,53 @@ def test_endpoint_returns_contract_fields_for_cars():
     assert routes[0]["geometry"]["type"] == "LineString"
     assert routes[0]["scores"]["parking"] is None
     assert graph.calls[0][0] == "driving-car"
+
+
+FRONTEND_REQUEST = {  # what the frontend sends: an optional intermediate stop
+    "from": {"lat": 50.06686331811255, "lon": 19.93412799209031},
+    "to": {"lat": 50.06705043002839, "lon": 19.930265608621056},
+    "via": [{"lat": 50.06549504004241, "lon": 19.93070285958069}],
+    "profile": "driving-car",
+    "weights": {"surface": 2, "views": 0, "safety": 0, "traffic": 0, "parking": 0},
+}
+
+
+def test_endpoint_accepts_the_frontend_request_with_via():
+    graph = use(FakeGraph(SCENIC, FAST))
+    res = client.post("/api/v1/route", json=FRONTEND_REQUEST)
+    assert res.status_code == 200
+    assert [r["rank"] for r in res.json()["routes"]] == [1, 2]
+    profile, legs, variants = graph.calls[0]
+    assert len(legs) == 2 and legs[0][1] == legs[1][0]  # from -> via, via -> to
+    assert variants[0] == Weights(surface=2)
+
+
+def test_via_is_optional():
+    use(FakeGraph(FAST))
+    body = {k: v for k, v in FRONTEND_REQUEST.items() if k != "via"}
+    assert client.post("/api/v1/route", json=body).status_code == 200
+
+
+def test_via_outside_krakow_is_rejected_with_its_index():
+    graph = use(FakeGraph(FAST))
+    res = client.post("/api/v1/route", json={**FRONTEND_REQUEST, "via": [{"lat": 52.23, "lon": 21.01}]})
+    assert res.status_code == 422 and res.json()["error"]["code"] == "OUT_OF_AREA"
+    assert res.json()["error"]["details"]["field"] == "via[0]" and graph.calls == []
+
+
+def test_too_many_via_stops_are_rejected():
+    use(FakeGraph(FAST))
+    stops = [{"lat": 50.06, "lon": 19.94}] * 6
+    res = client.post("/api/v1/route", json={**FRONTEND_REQUEST, "via": stops})
+    assert res.status_code == 422 and res.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_pedestrian_route_goes_through_the_via_stops():
+    res = client.post("/api/v1/route", json={**FRONTEND_REQUEST, "profile": "foot-walking"})
+    assert res.status_code == 200
+    routes = res.json()["routes"]
+    assert len(routes) == 1  # a route with stops is a single route
+    assert [19.93070285958069, 50.06549504004241] in routes[0]["geometry"]["coordinates"]
 
 
 def test_endpoint_serves_bikes_from_the_graph_too():
@@ -240,11 +321,12 @@ def test_postgres_source_maps_rows_and_scores():
     rows = [find_row(1, 10, 100, 200.0, True, [[19.9, 50.0], [19.91, 50.0]]),
             find_row(2, 11, 101, 50.0, False, [[19.91, 50.0], [19.92, 50.0]])]
     conn = FakeConnection([rows, rows], [{"segment_id": 100, "surface": 4.5, "views": None, "safety": 3.0,
-                                            "traffic": None, "parking": None}], [{"distance_m": 12.5}])
+                                            "traffic": None, "parking": None}], [{"node_id": 77, "distance_m": 12.5}])
     source = PostgresGraphSource(FakePool(conn))
 
-    assert source.snap_distance("driving-car", Point(**RYNEK)) == 12.5
-    paths = source.find("driving-car", Point(**RYNEK), Point(**PODGORZE), [Weights(surface=2, traffic=1), Weights()])
+    assert source.snap("driving-car", Point(**RYNEK)) == Snap(77, 12.5)
+    paths = source.find("driving-car", [(Point(**RYNEK), Point(**PODGORZE))],
+                        [Weights(surface=2, traffic=1), Weights()])
 
     assert len(paths) == 2 and [s.edge_id for s in paths[0]] == [10, 11]
     assert paths[0][0].scores["surface"] == 4.5 and paths[0][0].scores["views"] is None
@@ -259,16 +341,31 @@ def test_postgres_source_maps_rows_and_scores():
 
 def test_postgres_source_without_pool_raises_a_clean_error():
     with pytest.raises(AppError) as err:
-        PostgresGraphSource(None).snap_distance("driving-car", Point(**RYNEK))
+        PostgresGraphSource(None).snap("driving-car", Point(**RYNEK))
     assert (err.value.status, err.value.code) == (500, "INTERNAL_ERROR")
 
 
 def test_postgres_source_with_no_rows_returns_empty_paths_and_skips_the_scores_query():
     conn = FakeConnection([[]], [], [])
     source = PostgresGraphSource(FakePool(conn))
-    assert source.find("driving-car", Point(**RYNEK), Point(**PODGORZE), [Weights()]) == [[]]
+    assert source.find("driving-car", [(Point(**RYNEK), Point(**PODGORZE))], [Weights()]) == [[]]
     assert not any("segment_scores" in sql for sql, _ in conn.executed)
-    assert source.snap_distance("driving-car", Point(**RYNEK)) is None
+    assert source.snap("driving-car", Point(**RYNEK)) is None
+
+
+def test_postgres_source_joins_the_legs_in_order_and_gives_up_when_one_has_no_route():
+    first = [find_row(1, 10, None, 100.0, False, [[19.90, 50.0], [19.91, 50.0]])]
+    second = [find_row(1, 20, None, 100.0, False, [[19.91, 50.0], [19.92, 50.0]])]
+    via = Point(lat=50.0540, lon=19.9353)
+    legs = [(Point(**RYNEK), via), (via, Point(**PODGORZE))]
+
+    joined = PostgresGraphSource(FakePool(FakeConnection([first, second], [], []))).find("driving-car", legs, [Weights()])
+    assert [s.edge_id for s in joined[0]] == [10, 20]
+    assert stitch(joined[0]) == [[19.90, 50.0], [19.91, 50.0], [19.92, 50.0]]
+
+    conn = FakeConnection([first, [], first, second], [], [])  # variant 1: second leg unreachable
+    paths = PostgresGraphSource(FakePool(conn)).find("driving-car", legs, [Weights(surface=1), Weights()])
+    assert paths[0] == [] and [s.edge_id for s in paths[1]] == [10, 20]
 
 
 # --- health ------------------------------------------------------------------------------------------------------

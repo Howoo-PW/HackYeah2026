@@ -1,6 +1,8 @@
 """POST /route for pedestrians (external provider path): mock provider end to end, ORS client against a fake
 transport, and scoring. Cars and bikes use the own graph, see test_graph_routing.py."""
 
+import json
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -108,6 +110,19 @@ async def test_ors_request_and_parsing():
     assert seen["auth"] == "secret-key"
     assert b'"alternative_routes"' in seen["body"] and b"[19.9373,50.0617]" in seen["body"].replace(b" ", b"")
     assert routes[0].distance_m == 900.5 and routes[0].coordinates[0] == [19.9373, 50.0617]
+
+
+async def test_ors_route_with_via_sends_all_coordinates_and_no_alternatives():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json=ORS_OK)
+
+    via = Point(lat=50.0580, lon=19.9400)
+    await ors(handler).routes(Point(**RYNEK), Point(**WAWEL), "foot-walking", [via])
+    assert seen["body"]["coordinates"] == [[19.9373, 50.0617], [19.94, 50.058], [19.9353, 50.054]]
+    assert "alternative_routes" not in seen["body"]  # ORS offers alternatives only for two coordinates
 
 
 @pytest.mark.parametrize(
