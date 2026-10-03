@@ -1,6 +1,6 @@
 import { metricScore, type Metric } from '../lib/dimensions'
 import { mockComments, mockCreatedComment, mockCreatedRating, mockSegmentDetail, mockSegments } from './mocks'
-import type { ApiError, Bbox, Opinion, Paginated, Rating, RatingInput, SegmentCollection, SegmentDetail } from './types'
+import type { ApiError, Bbox, GroupDetail, NearestSegment, Opinion, Paginated, Rating, RatingInput, RouteRequest, RouteResult, SegmentCollection, SegmentDetail, StreetHit } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api/v1'
 /** Force mock data even when the backend is up (set VITE_USE_MOCKS=true). */
@@ -9,19 +9,25 @@ const FORCE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 export class ApiRequestError extends Error {
   status: number
   code: string
+  /** Contract `error.details`, e.g. `{ field: "via[0]" }` for a point that is too far from any road. */
+  details: Record<string, unknown> | null
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, details: Record<string, unknown> | null = null) {
     super(message)
     this.status = status
     this.code = code
+    this.details = details
   }
 }
 
-async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, { signal })
+async function request<T>(path: string, signal?: AbortSignal, post?: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    signal,
+    ...(post !== undefined && { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(post) }),
+  })
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as ApiError | null
-    throw new ApiRequestError(res.status, body?.error.code ?? 'INTERNAL_ERROR', body?.error.message ?? res.statusText)
+    throw new ApiRequestError(res.status, body?.error.code ?? 'INTERNAL_ERROR', body?.error.message ?? res.statusText, body?.error.details ?? null)
   }
   return res.json() as Promise<T>
 }
@@ -135,4 +141,61 @@ export async function postComment(
   author: { id: string; display_name: string },
 ): Promise<Opinion> {
   return mockCreatedComment(segmentId, text, author)
+}
+
+/**
+ * GET /segments/nearest: the street under a point, used to show a name instead of coordinates.
+ * Best effort: returns null when there is no segment within 50 m or the backend is unavailable.
+ */
+export async function fetchNearestSegment(lat: number, lon: number, signal?: AbortSignal): Promise<NearestSegment | null> {
+  if (FORCE_MOCKS) return null
+  try {
+    return await request<NearestSegment>(`/segments/nearest?lat=${lat}&lon=${lon}`, signal)
+  } catch (err) {
+    if (signal?.aborted) throw err
+    return null
+  }
+}
+
+/**
+ * GET /search: street autocomplete from our own database (contract 5.10).
+ * Returns null when the backend cannot answer (down, older version without the endpoint, rate limit),
+ * so the caller can fall back to another source.
+ */
+export async function fetchStreets(query: string, limit: number, signal?: AbortSignal): Promise<StreetHit[] | null> {
+  if (FORCE_MOCKS) return null
+  try {
+    const res = await request<{ items: StreetHit[] }>(`/search?q=${encodeURIComponent(query)}&limit=${limit}`, signal)
+    return res.items
+  } catch (err) {
+    if (signal?.aborted) throw err
+    return null
+  }
+}
+
+/**
+ * GET /groups/{id}: the street stretch a segment belongs to. Best effort: null when the backend cannot
+ * answer, in which case the panel simply shows the single segment.
+ */
+export async function fetchGroup(id: number, signal?: AbortSignal): Promise<GroupDetail | null> {
+  if (FORCE_MOCKS) return null
+  try {
+    return await request<GroupDetail>(`/groups/${id}`, signal)
+  } catch (err) {
+    if (signal?.aborted) throw err
+    return null
+  }
+}
+
+/**
+ * POST /route: up to three alternative routes, best first for the given weights (contract 5.8).
+ * Errors keep the server's message (e.g. 422 OUT_OF_AREA, 502 when the routing engine is down).
+ */
+export async function fetchRoutes(req: RouteRequest, signal?: AbortSignal): Promise<RouteResult[]> {
+  try {
+    return (await request<{ routes: RouteResult[] }>('/route', signal, req)).routes
+  } catch (err) {
+    if (signal?.aborted || err instanceof ApiRequestError) throw err
+    throw new ApiRequestError(0, 'NETWORK', 'Nie można połączyć się z serwerem tras. Spróbuj ponownie.')
+  }
 }

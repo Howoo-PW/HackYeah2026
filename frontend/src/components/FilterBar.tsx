@@ -1,6 +1,5 @@
 import type { SegmentFilter } from '../api/client'
 import { METRICS, SCORE_COLORS } from '../lib/dimensions'
-import AccountButton from '../auth/AccountButton'
 import type { Metric } from '../lib/dimensions'
 
 type Props = {
@@ -8,6 +7,7 @@ type Props = {
   onDimension: (d: Metric) => void
   filter: SegmentFilter
   onFilter: (f: SegmentFilter) => void
+  onClose: () => void
 }
 
 const ICONS: Record<Metric, string> = {
@@ -19,25 +19,22 @@ const ICONS: Record<Metric, string> = {
   parking: '🅿️',
 }
 
-/** Left sidebar: dimension picker (what the map is colored by), legend, min-score filter and rated-only toggle. */
-export default function FilterBar({ dimension, onDimension, filter, onFilter }: Props) {
+/** Filters card (opened from the "Filtry" button under the search bar): dimension picker (what the map is colored by), legend, min-score filter and rated-only toggle. */
+export default function FilterBar({ dimension, onDimension, filter, onFilter, onClose }: Props) {
   const current = METRICS.find((d) => d.id === dimension)!
   const minScore = filter.minScore ?? 1
 
   return (
     <section className="pointer-events-auto w-full overflow-hidden rounded-2xl bg-white/95 shadow-xl ring-1 ring-black/5 backdrop-blur">
-      <header className="bg-gradient-to-r from-gray-900 to-gray-700 px-4 py-3 text-white">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h1 className="text-base font-bold leading-tight">Rate My Road</h1>
-            <p className="text-xs text-gray-300">Oceny dróg</p>
-          </div>
-          <AccountButton />
-        </div>
+      <header className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
+        <h1 className="text-base font-bold">Filtry i kolory mapy</h1>
+        <button onClick={onClose} aria-label="Zamknij filtry" className="rounded-full p-1.5 text-gray-600 hover:bg-gray-100">
+          ✕
+        </button>
       </header>
 
       <div className="p-3">
-        <h2 className="px-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Filtruj według</h2>
+        <h2 className="px-1 text-[11px] font-semibold uppercase tracking-wider text-gray-700">Filtruj według</h2>
         <div className="mt-1.5 grid grid-cols-1 gap-1" role="tablist" aria-label="Wymiar oceny">
           {METRICS.map((d) => {
             const active = d.id === dimension
@@ -66,13 +63,13 @@ export default function FilterBar({ dimension, onDimension, filter, onFilter }: 
             style={{ background: `linear-gradient(to right, ${SCORE_COLORS.join(',')})` }}
             aria-hidden
           />
-          <div className="mt-1.5 flex justify-between gap-3 text-[11px] leading-tight text-gray-500">
+          <div className="mt-1.5 flex justify-between gap-3 text-[11px] leading-tight text-gray-600">
             <span>1 · {current.low}</span>
             <span className="text-right">{current.high} · 5</span>
           </div>
         </div>
 
-        <h2 className="mt-4 px-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Filtry</h2>
+        <h2 className="mt-4 px-1 text-[11px] font-semibold uppercase tracking-wider text-gray-700">Filtry</h2>
         <div className="mt-1.5 space-y-3 px-1 text-sm text-gray-700">
           <div>
             <label className="flex cursor-pointer items-center justify-between">
