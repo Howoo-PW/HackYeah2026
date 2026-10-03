@@ -1,5 +1,6 @@
 import type { SegmentFilter } from '../api/client'
 import { METRICS, SCORE_COLORS } from '../lib/dimensions'
+import AccountButton from '../auth/AccountButton'
 import type { Metric } from '../lib/dimensions'
 
 type Props = {
@@ -26,8 +27,13 @@ export default function FilterBar({ dimension, onDimension, filter, onFilter }: 
   return (
     <section className="pointer-events-auto w-full overflow-hidden rounded-2xl bg-white/95 shadow-xl ring-1 ring-black/5 backdrop-blur">
       <header className="bg-gradient-to-r from-gray-900 to-gray-700 px-4 py-3 text-white">
-        <h1 className="text-base font-bold leading-tight">Rate My Road</h1>
-        <p className="text-xs text-gray-300">Oceny dróg</p>
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h1 className="text-base font-bold leading-tight">Rate My Road</h1>
+            <p className="text-xs text-gray-300">Oceny dróg</p>
+          </div>
+          <AccountButton />
+        </div>
       </header>
 
       <div className="p-3">

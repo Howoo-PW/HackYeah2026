@@ -72,12 +72,15 @@ export type Comment = {
  * Needs a contract PR (B1 + FE) before the real backend can return it; until then it comes from mocks.
  */
 export type Opinion = Comment & {
-  rating: Rating | null
-  author_opinions_count: number
-  likes: number
-  dislikes: number
-  my_vote: 'up' | 'down' | null
+  rating?: Rating | null
+  author_opinions_count?: number
+  likes?: number
+  dislikes?: number
+  my_vote?: 'up' | 'down' | null
 }
+
+/** Body of POST /segments/{id}/ratings (contract 5.3). */
+export type RatingInput = Partial<Record<Dimension, number | null>> & { time_of_day?: TimeOfDay }
 
 export type Paginated<T> = { items: T[]; page: number; page_size: number; total: number }
 

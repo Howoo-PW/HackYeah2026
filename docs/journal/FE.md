@@ -4,6 +4,21 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+## 2026-10-03 — Beata — gałąź `frontend/auth-rating`
+
+**Zadanie:** logowanie (Supabase Auth), formularz oceny i dodawanie opinii (kroki 14 planu).
+
+**Zrobione:**
+- `@supabase/supabase-js`; klient tylko do logowania (`src/lib/supabase.ts`, klucz publishable z `.env`, nigdy secret).
+- `src/auth/`: `AuthProvider` (sesja), `AuthDialog` (logowanie i rejestracja, polskie błędy), `AccountButton` w nagłówku lewego panelu.
+- `client.ts`: JWT w `Authorization: Bearer`, `postRating` (`POST /segments/{id}/ratings`) i `postComment` (`POST /segments/{id}/comments`), przy braku backendu mock.
+- `RatingForm` (5 wymiarów 1–5, każdy opcjonalny, pora dnia) i `CommentForm` (do 1000 znaków) w panelu odcinka.
+
+**Dalej / blokery:**
+- Przetestować logowanie na prawdziwym koncie i potwierdzenie e-mail (ustawienie w Supabase Auth).
+- Zdjęcia (przesyłanie, galeria) czekają na `backend/photos` (B2).
+- Klucz `sb_secret_...` trafił do czatu: zrotować w Supabase.
+
 ## 2026-10-03 — Beata — gałąź `frontend/map`
 
 **Zadanie:** mapa Krakowa z kolorowaniem odcinków wg wymiaru, filtr i panel szczegółów (kroki 12–13 planu).

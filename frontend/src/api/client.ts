@@ -1,6 +1,6 @@
 import { metricScore, type Metric } from '../lib/dimensions'
-import { mockComments, mockSegmentDetail, mockSegments } from './mocks'
-import type { ApiError, Bbox, Opinion, Paginated, SegmentCollection, SegmentDetail } from './types'
+import { mockComments, mockCreatedComment, mockCreatedRating, mockSegmentDetail, mockSegments } from './mocks'
+import type { ApiError, Bbox, Opinion, Paginated, Rating, RatingInput, SegmentCollection, SegmentDetail } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api/v1'
 /** Force mock data even when the backend is up (set VITE_USE_MOCKS=true). */
@@ -115,4 +115,24 @@ function applyMockFilter(data: SegmentCollection, filter: SegmentFilter): Segmen
     return true
   })
   return { ...data, features }
+}
+
+// Forms are UI-only for now: nothing is sent anywhere, the result lives in component state until reload.
+// TODO(backend/core): replace the bodies below with
+//   POST /segments/{id}/ratings  (body: RatingInput, 201 new / 200 replaced -> Rating)
+//   POST /segments/{id}/comments (body: { text }, 201 -> Comment)
+// and send the Supabase JWT as `Authorization: Bearer` (see getSession in lib/supabase.ts).
+
+/** Builds the rating the form just collected, locally. */
+export async function postRating(segmentId: number, input: RatingInput): Promise<Rating> {
+  return mockCreatedRating(segmentId, input)
+}
+
+/** Builds the opinion the form just collected, locally. */
+export async function postComment(
+  segmentId: number,
+  text: string,
+  author: { id: string; display_name: string },
+): Promise<Opinion> {
+  return mockCreatedComment(segmentId, text, author)
 }

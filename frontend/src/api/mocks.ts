@@ -1,5 +1,5 @@
 // Mock data shaped like the examples in docs/CONTRACT.md. Used when the backend is unreachable.
-import type { Bbox, Opinion, Paginated, Rating, Scores, Summary, SegmentCollection, SegmentDetail, SegmentProperties } from './types'
+import type { Bbox, Opinion, Paginated, Rating, RatingInput, Scores, Summary, SegmentCollection, SegmentDetail, SegmentProperties } from './types'
 
 // A few streets around the Old Town as [lon, lat] polylines, split into short segments below.
 const STREETS: { name: string; highway: string; coords: [number, number][] }[] = [
@@ -146,4 +146,40 @@ export function mockComments(segmentId: number, page: number, pageSize: number):
   })
   const start = (page - 1) * pageSize
   return { items: all.slice(start, start + pageSize), page, page_size: pageSize, total }
+}
+
+function timeOfDayNow(): Rating['time_of_day'] {
+  const h = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/Warsaw' }).format(new Date()))
+  if (h >= 6 && h < 10) return 'morning'
+  if (h >= 10 && h < 16) return 'day'
+  if (h >= 16 && h < 22) return 'evening'
+  return 'night'
+}
+
+/** What the backend would return for POST /ratings; used when the backend is unreachable. */
+export function mockCreatedRating(segmentId: number, input: RatingInput): Rating {
+  return {
+    id: crypto.randomUUID(),
+    segment_id: segmentId,
+    surface: input.surface ?? null,
+    views: input.views ?? null,
+    safety: input.safety ?? null,
+    traffic: input.traffic ?? null,
+    parking: input.parking ?? null,
+    time_of_day: input.time_of_day ?? timeOfDayNow(),
+    created_at: new Date().toISOString(),
+  }
+}
+
+/** What the backend would return for POST /comments; used when the backend is unreachable. */
+export function mockCreatedComment(segmentId: number, text: string, author: { id: string; display_name: string }): Opinion {
+  return {
+    id: crypto.randomUUID(),
+    segment_id: segmentId,
+    author,
+    text,
+    status: 'visible',
+    created_at: new Date().toISOString(),
+    rating: null,
+  }
 }

@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { fetchComments, fetchSegmentDetail } from '../api/client'
-import type { Opinion, Scores, SegmentDetail, Summary } from '../api/types'
+import type { Opinion, Rating, Scores, SegmentDetail, Summary } from '../api/types'
+import { useAuth } from '../auth/useAuth'
 import { DIMENSIONS, overallScore, scoreColor } from '../lib/dimensions'
+import CommentForm from './CommentForm'
 import OpinionCard, { Stars } from './OpinionCard'
+import RatingForm from './RatingForm'
 
 type Props = { segmentId: number; onClose: () => void }
 
@@ -15,6 +18,12 @@ export default function SegmentPanel({ segmentId, onClose }: Props) {
   const [detail, setDetail] = useState<SegmentDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [width, setWidth] = useStoredWidth()
+  const { user } = useAuth()
+  const userId = user?.id
+  // The user's rating right after saving, until the backend's `my_rating` catches up (or in mock mode).
+  const [saved, setSaved] = useState<{ userId: string | undefined; rating: Rating } | null>(null)
+  const savedRating = saved && saved.userId === userId ? saved.rating : null
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
     const ctrl = new AbortController()
@@ -24,7 +33,7 @@ export default function SegmentPanel({ segmentId, onClose }: Props) {
         if (!ctrl.signal.aborted) setError(err.message)
       })
     return () => ctrl.abort()
-  }, [segmentId])
+  }, [segmentId, userId, reload])
 
   return (
     <div
@@ -72,6 +81,15 @@ export default function SegmentPanel({ segmentId, onClose }: Props) {
               )
             })}
           </ul>
+
+          <RatingForm
+            segmentId={segmentId}
+            existing={savedRating ?? detail.my_rating}
+            onSaved={(r) => {
+              setSaved({ userId, rating: r })
+              setReload((n) => n + 1)
+            }}
+          />
 
           <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-1 text-sm text-gray-600">
             <dt>Nawierzchnia (OSM)</dt>
@@ -251,6 +269,13 @@ function CommentsSection({ segmentId }: { segmentId: number }) {
   return (
     <section className="mt-5 border-t border-gray-100 pt-4">
       <h3 className="text-sm font-semibold">Opinie{total !== null && ` (${total})`}</h3>
+      <CommentForm
+        segmentId={segmentId}
+        onPosted={(o) => {
+          setItems((prev) => [o, ...prev])
+          setTotal((t) => (t ?? 0) + 1)
+        }}
+      />
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       {total === 0 && <p className="mt-2 text-sm text-gray-500">Nikt jeszcze nie opisał tej drogi.</p>}
       <ul className="mt-1 divide-y divide-gray-100">
