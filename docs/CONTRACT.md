@@ -112,9 +112,30 @@ type SegmentProperties = {
   name: string | null;
   highway: string;            // tag OSM, np. "primary", "residential"
   length_m: number;
-  scores: Scores;
-  ratings_count: number;
+  scores: Scores;             // efektywne: własne oceny, a bez nich szacunek z grupy (patrz niżej)
+  scores_own: Scores;         // zwykłe średnie z ocen samego odcinka (null = brak)
+  scores_source: "own" | "group" | "none";   // skąd wynik: własne oceny / sąsiednie odcinki grupy / brak
+  confidence: "none" | "low" | "medium" | "high";
+  group: GroupRef | null;     // odcinek ulicy, do którego należy ten kawałek
+  ratings_count: number;      // tylko własne oceny odcinka
   active_obstacles_count: number;
+};
+
+type GroupRef = {             // grupa = kolejne kawałki jednej ulicy, ok. 500 m
+  id: number;
+  name: string | null;
+  highway: string;
+  length_m: number;
+  segments_count: number;
+  from_street: string | null; // najważniejsza inna ulica na początku grupy
+  to_street: string | null;   // ... i na końcu
+  ratings_count: number;      // oceny wszystkich odcinków grupy
+};
+
+type GroupDetail = GroupRef & {
+  scores: Scores;             // średnie grupy (ściągane do średniej typu drogi, gdy ocen jest mało)
+  geometry: GeoJSON.MultiLineString;
+  segment_ids: number[];
 };
 
 type SegmentDetail = SegmentProperties & {
@@ -258,6 +279,19 @@ Limit: max 2000 odcinków na odpowiedź. Przy większym obszarze → `422 VALIDA
   ]
 }
 ```
+
+**Grupy i wynik efektywny.** OSM tnie drogi na każdym skrzyżowaniu, więc połowa odcinków ma
+poniżej 100 m i nikt ich nie oceni. Odcinki (`id`) i oceny zostają bez zmian. Dodatkowo kolejne
+kawałki jednej ulicy (ta sama nazwa i typ drogi) tworzą **grupę** po ok. 500 m. Wynik `scores`
+odcinka liczy się tak: własne oceny odcinka (ważą tyle, co 2 oceny grupy), w przeciwnym razie
+średnia pozostałych odcinków grupy, ściągana do średniej typu drogi, gdy ocen jest mało.
+`scores_source` mówi, skąd wynik: `own`, `group` (szacunek, pokaż jaśniej) lub `none`.
+`rated_only` i `min_score` działają na wyniku efektywnym i filtrują po limicie 2000 odcinków.
+
+#### `GET /groups/{id}` — P
+
+Odpowiedź: `GroupDetail`: scalona geometria do podświetlenia na mapie, id odcinków i średnie
+grupy. Nieznane id → `404 NOT_FOUND`.
 
 #### `GET /segments/nearest?lat=&lon=` — P
 
@@ -421,7 +455,7 @@ Pełny schemat w [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md#3-struktura-
 
 | Element | Nazwa |
 |---|---|
-| Tabele | `profiles`, `segments`, `ratings`, `comments`, `obstacles`, `parking_spots`, `segment_photos`, `segment_summaries` |
+| Tabele | `profiles`, `segments`, `segment_groups`, `ratings`, `comments`, `obstacles`, `parking_spots`, `segment_photos`, `segment_summaries` |
 | Widok materializowany | `segment_stats` |
 | Bucket Storage | `segment-photos` (prywatny) |
 | Rola admina | `auth.users.raw_app_meta_data ->> 'role' = 'admin'` |

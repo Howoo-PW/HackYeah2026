@@ -116,14 +116,42 @@ class LineString(BaseModel):
     coordinates: list[list[float]]
 
 
+class GroupRef(BaseModel):
+    """The street stretch (about 500 m) a segment belongs to; users rate and see it as one unit."""
+
+    id: int
+    name: str | None
+    highway: str
+    length_m: float
+    segments_count: int
+    from_street: str | None
+    to_street: str | None
+    ratings_count: int
+
+
+class MultiLineString(BaseModel):
+    type: Literal["MultiLineString"] = "MultiLineString"
+    coordinates: list[list[list[float]]]
+
+
+class GroupDetail(GroupRef):
+    scores: Scores
+    geometry: MultiLineString
+    segment_ids: list[int]
+
+
 class SegmentProperties(BaseModel):
     id: int
     osm_way_id: int
     name: str | None
     highway: str
     length_m: float
-    scores: Scores
-    ratings_count: int
+    scores: Scores                      # effective: own ratings, else estimated from the group
+    scores_own: Scores = Scores()       # plain averages of this segment's own ratings
+    scores_source: Literal["own", "group", "none"] = "none"
+    confidence: Literal["none", "low", "medium", "high"] = "none"
+    group: GroupRef | None = None
+    ratings_count: int                  # own ratings only
     active_obstacles_count: int
 
 
