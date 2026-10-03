@@ -1,4 +1,4 @@
-# Rate Your Ride — instrukcje dla Claude
+# Rate My Road — instrukcje dla Claude
 
 Aplikacja do oceniania odcinków dróg w Krakowie. Zespół 4 osób, hackathon HackYeah 2026.
 

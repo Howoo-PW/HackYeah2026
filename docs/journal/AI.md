@@ -4,6 +4,29 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+## 2026-10-04 — prukasz — gałąź `ai/llm-openrouter`
+
+**Zadanie:** pierwsze prawdziwe wywołanie LLM w serwisie AI (dotąd tylko mock).
+
+**Zrobione:**
+- model: `stealth/space-bunny-alpha` przez OpenRouter (API zgodne z OpenAI, darmowy podgląd), konfiguracja tylko w `.env`
+- odkryte w teście: domyślne `with_structured_output` nie działa (model zwraca własne klucze albo markdown, 0/3 poprawnych), a pojedyncza odpowiedź trwała 7–21 s
+- poprawka: `AI_STRUCTURED_METHOD=json_mode` (schemat opisany w prompcie, `schema_hint`) i `AI_REASONING_EFFORT=low`: 3/3 poprawnych, ok. 4–5 s (limit w kontrakcie to 15 s)
+- sprawdzone przez HTTP na kontenerze: polecenie wstrzyknięte w komentarzu zostało zignorowane
+- porównanie modeli (OpenRouter, 9 darmowych): Space Bunny Alpha 3/3 w 2,7 s, Laguna S 2.1 3/3 w 4,9 s; reszta wolniejsza lub z błędami schematu
+- **OpenAI (klucz własny, budżet 4 USD): wybrany `gpt-5.4-nano` z `AI_REASONING_EFFORT=none`**: 3/3 na realistycznym przypadku, ok. 1,5 s, ok. $0,0003 za wywołanie (ok. 13 tys. wywołań za 4 USD). `gpt-5-nano` w trybie `minimal` odrzucony: 0/3, za każdym razem gubi nawierzchnię i widoki (`brak informacji`); w trybie `low` poprawny, ale 9 s
+- modele gpt-5 przyjmują `reasoning_effort` i odrzucają `temperature`: `_model()` rozróżnia OpenAI natywne od bramek (OpenRouter: `extra_body`)
+- 7 nowych testów konfiguracji (bez sieci), razem 17
+
+**Dalej / blokery:**
+- jakość: model dopisuje wnioski spoza komentarzy (np. `safety` z samych dziur) i wpisuje do `conflicts` różnice pory dnia, które nie są sprzecznością; do dopracowania w prompcie
+- `/analyze-surface` (zdjęcia) nieprzetestowane na prawdziwym modelu
+- stealth = anonimowy dostawca, możliwe logowanie zapytań i zniknięcie modelu; klucz OpenRouter zostaje w `.env` jako `OPENROUTER_API_KEY` (zapas), przełączenie to 4 linijki w `.env`
+- koszt: ustawić twardy limit wydatków w koncie OpenAI; backend cache'uje streszczenia w `segment_summaries`, więc AI woła się tylko przy zmianie komentarzy
+- klucz OpenAI też trafił do rozmowy: po hackathonie unieważnić
+- klucz OpenRouter trafił do rozmowy: zalecana rotacja po hackathonie
+
+
 ## 2026-10-04 — prukasz — gałąź `backend/segment-groups`
 
 **Zadanie:** połączyć krótkie odcinki w grupy ocenialne przez użytkownika i dać każdemu odcinkowi wynik także wtedy, gdy ocenili tylko sąsiadów.

@@ -1,4 +1,4 @@
-# Serwis AI — Rate Your Ride
+# Serwis AI — Rate My Road
 
 FastAPI + LangChain. Właściciel: AI. Kontrakt: [../docs/CONTRACT.md](../docs/CONTRACT.md), sekcja 6. Serwis wewnętrzny — woła go tylko backend z nagłówkiem `X-Internal-Key`.
 

@@ -1,4 +1,4 @@
-# Frontend — Rate Your Ride
+# Frontend — Rate My Road
 
 React + Vite + TypeScript + Tailwind CSS. Właściciel: FE. Kontrakt API: [../docs/CONTRACT.md](../docs/CONTRACT.md), mapy: [../docs/MAP_STACK.md](../docs/MAP_STACK.md).
 

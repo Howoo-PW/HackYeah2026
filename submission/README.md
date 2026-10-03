@@ -4,7 +4,7 @@ Kopiuj wartości do formularza w tej kolejności. Teksty długich pól są w oso
 
 | Pole formularza | Wartość |
 |---|---|
-| **Project Name** | Rate Your Ride (w formularzu jest wpisane „Rate My Road” — wybierzcie jedną nazwę i używajcie jej wszędzie, także w repo i aplikacji) |
+| **Project Name** | Rate My Road (ta sama nazwa w formularzu, repo i aplikacji) |
 | **Published** | zaznaczyć dopiero po uzupełnieniu statystyk w problemie i dodaniu obrazka |
 | **Problem** | [problem.md](problem.md) — „brief outline of why you want to implement such a project”, zalecane statystyki |
 | **Solution** | [solution.md](solution.md) — „description of the solution, benefits for the user or customer” |
@@ -15,7 +15,7 @@ Kopiuj wartości do formularza w tej kolejności. Teksty długich pól są w oso
 ## Przed wysłaniem
 
 - [ ] Uzupełnić statystyki w [problem.md](problem.md) (z podanym źródłem) i usunąć znacznik DO UZUPEŁNIENIA
-- [ ] Ustalić nazwę (Rate Your Ride czy Rate My Road)
+- [x] Nazwa ustalona: Rate My Road (ujednolicona w repo)
 - [ ] Przygotować obraz okładki
 - [ ] Sprawdzić limity długości pól w formularzu (teksty mają ok. 100–150 słów)
 - [ ] Wersja angielska, jeśli formularz tego wymaga (teraz tekst jest po polsku)

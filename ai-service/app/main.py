@@ -12,7 +12,7 @@ from .schemas import SummarizeRequest, SummaryOut, SurfaceOut, SurfaceRequest
 
 log = logging.getLogger("ai")
 
-app = FastAPI(title="Rate Your Ride AI", version="0.1.0")
+app = FastAPI(title="Rate My Road AI", version="0.1.0")
 install_error_handlers(app)
 
 

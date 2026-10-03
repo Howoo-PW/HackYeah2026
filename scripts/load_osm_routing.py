@@ -64,7 +64,7 @@ def fetch_tile(index: int, bbox: str, from_cache: bool) -> list[dict]:
     for attempt in range(8):
         url = SERVERS[attempt % len(SERVERS)]
         try:
-            req = urllib.request.Request(url, body, {"User-Agent": "RateYourRide/0.1 (hackathon project)"})
+            req = urllib.request.Request(url, body, {"User-Agent": "RateMyRoad/0.1 (hackathon project)"})
             with urllib.request.urlopen(req, timeout=300) as response:
                 raw = response.read()
             data = json.loads(raw)
