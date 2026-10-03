@@ -48,6 +48,8 @@ Stan opisuje bieżący branch; nie oznaczaj cudzych zmian jako scalonych.
   do backend/b1-howoo. Mapa, routing mock i AI mock działają lokalnie.
 - Współdzielone limity Redis, trwały wolumen i testy wielu klientów. GitHub Actions
   sprawdza backend/AI/frontend. 70 testów backendu i 10 AI PASS; frontend build/lint PASS.
+- Branch opublikowany, draft PR #2, GitHub Actions PASS. Main chroniony: PR,
+  1 akceptacja, checki backend/ai/frontend i zakaz force-push/usunięcia (także admin).
 
 ## TODO
 
@@ -58,4 +60,4 @@ Stan opisuje bieżący branch; nie oznaczaj cudzych zmian jako scalonych.
 - backend/ai-integration (AI): cache; routing mock wymienić na rzeczywisty provider
   i źródło segmentów PostGIS. Serwis AI i routing już scalone.
 - frontend/* (FE): Auth/formularze i PWA; mapa już scalona.
-- setup/repo: ochrona main oraz uprawnienia wszystkich członków zespołu.
+- setup/repo: sprawdzić uprawnienia zespołu; ochrona main gotowa.
