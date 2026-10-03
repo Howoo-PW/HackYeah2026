@@ -4,6 +4,8 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+
+
 ## 2026-10-03 — Beata — gałąź `frontend/auth-rating`
 
 **Zadanie:** logowanie (Supabase Auth), formularz oceny i dodawanie opinii (kroki 14 planu).
@@ -38,4 +40,3 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 - Typ `Opinion` (ocena autora przy komentarzu, głosy 👍/👎) jest poza kontraktem: potrzebny osobny PR do `docs/CONTRACT.md` uzgodniony z B1 i B2.
 - Prawdziwe ulice dopiero po seedzie z OSM (B2, `db/seed-krakow`) i `GET /segments` (B1, `backend/core`); mocki mają zgadnięte współrzędne.
 - Skill `frontend` jest na gałęzi `docs/skills` (B1), jeszcze nie w `main`.
-

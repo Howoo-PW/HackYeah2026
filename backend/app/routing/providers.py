@@ -94,6 +94,7 @@ class MockProvider:
 
 
 def build_provider() -> RouteProvider:
-    if settings.routing_provider == "ors" and settings.ors_api_key:
-        return OrsProvider(settings.ors_api_key, settings.ors_base_url)
+    key = settings.ors_api_key.get_secret_value()
+    if settings.routing_provider == "ors" and key:
+        return OrsProvider(key, settings.ors_base_url)
     return MockProvider()

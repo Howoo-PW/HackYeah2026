@@ -4,6 +4,8 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+
+
 ## 2026-10-03 — prukasz — gałąź `backend/routing`
 
 **Zadanie:** auto-routing `POST /api/v1/route` niezależnie od reszty zespołu (bez bazy i B1).
@@ -31,7 +33,6 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 **Dalej / blokery:**
 - wybrać dostawcę i model, dodać klucz do `.env` i przetestować prawdziwe podsumowania po polsku
 - integracja w backendzie (`backend/ai-integration`) po `backend/core` od B1
-
 ## 2026-10-03 — prukasz — gałąź `setup/docker`
 
 **Zadanie:** postawić Docker Compose ze szkieletami wszystkich usług, zanim zespół zacznie pracę.

@@ -22,3 +22,20 @@ docker compose up --build
 Zmiany w kodzie przeładowują się automatycznie. Po zmianie `requirements.txt` lub `package.json`: `docker compose up --build`.
 
 Baza danych to Supabase online — lokalnej bazy nie ma.
+
+## B1 — backend i diagnostyka
+
+Implementacja B1 na osobnym branchu `backend/b1-howoo`.
+Uruchomienie i testy: [backend/README.md](backend/README.md).
+Analiza branchy i dalsza integracja: [docs/B1_HANDOFF.md](docs/B1_HANDOFF.md).
+
+```bash
+python scripts/verify_env.py --skip-services # diagnostyka przed uruchomieniem
+python scripts/verify_env.py --start         # budowa i start Compose, potem health
+python scripts/create_dev_admin.py          # tylko APP_ENV=dev, dane w .env
+```
+
+Diagnostyka nie wypisuje wartości kluczy. Puste zmienne opcjonalne (np.
+AI_API_KEY przy MOCK_AI=true) są dozwolone. Brak konfiguracji DB oznacza
+health 503/down; frontend czeka na sprawny backend.
+Supabase MCP w `.mcp.json` działa read-only i wymaga osobistego OAuth przez `/mcp`.

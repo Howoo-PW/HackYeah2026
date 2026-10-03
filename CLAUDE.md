@@ -2,7 +2,12 @@
 
 Aplikacja do oceniania odcinków dróg w Krakowie. Zespół 4 osób, hackathon HackYeah 2026.
 
-Wersja minimalna. Pełne `CLAUDE.md` i skille (`.claude/skills/`) dodaje B1 na gałęzi `docs/skills`.
+Przed każdą pracą załaduj `.claude/skills/project-overview/SKILL.md`,
+a potem skill obszaru (`backend`, `database`, `ai`, `frontend`).
+Są w `.claude/skills/`. Globalny stan i TODO prowadź w overview.
+
+Po zmianie kodu dodaj docstringi/JSDoc publicznych funkcji, zaktualizuj strukturę,
+Stan i TODO skilla obszaru i overview oraz dziennik swojej roli.
 
 ## Najpierw przeczytaj
 
@@ -14,7 +19,7 @@ Wersja minimalna. Pełne `CLAUDE.md` i skille (`.claude/skills/`) dodaje B1 na g
 
 Hook `SessionStart` podaje, kto pracuje (z `.claude/role.local.json`) i stan gita.
 
-1. Jeśli rola nie jest znana — zapytaj o imię i rolę (FE / B1 / B2 / AI) i zapisz do `.claude/role.local.json`.
+1. Jeśli rola nie jest znana z wiadomości ani pliku lokalnego — zapytaj o imię i rolę (FE / B1 / B2 / AI) i zapisz do `.claude/role.local.json`.
 2. Zapytaj, nad czym osoba teraz pracuje (zadanie, gałąź), chyba że pierwsza wiadomość to mówi.
 3. Sprawdź stan gita: `git status`, `git fetch`, aktualna gałąź. Na `main` nie pracujemy — przełącz na gałąź z sekcji 7 planu albo zapytaj.
 4. Dodaj wpis w dzienniku tej osoby (niżej).

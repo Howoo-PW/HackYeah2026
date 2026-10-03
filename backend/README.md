@@ -1,24 +1,57 @@
-# Backend — Rate Your Ride
+# Backend B1
 
-FastAPI. Właściciele: B1 (core), B2 (baza), AI (routing, integracja AI). Kontrakt: [../docs/CONTRACT.md](../docs/CONTRACT.md).
+Endpointy i modele: [kontrakt](../docs/CONTRACT.md). Dokumentacja działającego API: http://localhost:8000/docs.
 
-## Moduł `app/routing` — `POST /api/v1/route`
+## Lokalnie
 
-Trasy alternatywne z dostawcy, ocena każdej wg ocen odcinków i wag użytkownika, ranking.
+Z katalogu repo:
 
-| Plik | Rola |
-|---|---|
-| `providers.py` | `OrsProvider` (OpenRouteService, do 3 alternatyw) i `MockProvider` (bez klucza: trasa prosta + objazdy ±0,003° lon) |
-| `segments.py` | `SegmentSource`: odcinki leżące na trasie. Teraz `InMemorySegmentSource` z `data/sample_segments.geojson` (dane przykładowe!). **B2 podmienia na PostGIS** — ten sam interfejs `matches(route, buffer_m, min_share)` |
-| `scoring.py` | Średnie ważone długością odcinków, wynik wg wag, ranking |
-| `router.py` | Endpoint, walidacja obszaru Krakowa (`OUT_OF_AREA`) |
-
-Zasady: odcinek należy do trasy, gdy ≥ 50% jego długości leży w buforze 15 m od trasy. Bez wag wygrywa najszybsza trasa. Wymiar bez ocen = `null`, nie 0. `coverage` mówi, jaka część trasy ma oceny.
-
-Konfiguracja: `ROUTING_PROVIDER=mock|ors`, `ORS_API_KEY`. Zdrowie: `routing` w `/api/v1/health` (bez zapytania do ORS, żeby nie zużywać limitu).
-
-## Testy
-
-```bash
-docker compose run --rm --no-deps -v ./backend:/app backend sh -c "pip install -q -r requirements-dev.txt && python -m pytest -q"
+```powershell
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -r backend/requirements-dev.txt
+.venv/Scripts/python.exe -m pytest -c backend/pytest.ini backend/tests -q
+docker compose up -d redis ai
+.venv/Scripts/python.exe -m uvicorn app.main:app --app-dir backend --port 8000 --reload
 ```
+
+Backend czyta `.env` z root niezależnie od katalogu uruchomienia; opcjonalne
+backend/.env ma pierwszeństwo, potem zmienne środowiska.
+SUPABASE_DB_URL: adres Supabase poolera IPv4 z hasłem, SSL wymagany. Backend
+korzysta z psycopg zamiast Data API dla zapytań przestrzennych i transakcji.
+Połączenie DB jest uprzywilejowane; wszystkie zapisy kontroluje backend.
+SERVICE_ROLE_KEY jest przeznaczony dla modułu Storage B2/skryptu admina;
+nie przekazuj go do frontendu. Nie ma lokalnej bazy ani produkcyjnych mocków core.
+
+## Zachowanie
+
+- JWT ES256/RS256: JWKS, issuer, audience, exp, iat, sub i role authenticated.
+- JWT HS256: weryfikacja online przez Supabase Auth; bez współdzielonego sekretu JWT.
+- Admin tylko z app_metadata, nigdy user_metadata. Zmiana roli w JWT staje się
+  widoczna po odświeżeniu tokenu; frontend korzysta z Supabase Auth.
+- Oceny: 1 na użytkownika/odcinek/dzień Warszawy, atomowe zastąpienie 200/201.
+- Limity prób zapisu: 30 ocen/h i 10 komentarzy/h.
+  Atomowy limiter Redis współdzieli kwotę między procesami. Compose zachowuje
+  dane w wolumenie AOF. Lokalny REDIS_URL: redis://localhost:16379/0.
+- Statystyki ocen liczone na żywo; segment_stats i jego odświeżanie pozostają u B2.
+- Moderacja komentarza usuwa cache AI odcinka. Publiczny odczyt tylko visible.
+- Health zwraca 503/down przy braku DB, 200/degraded przy niedostępnym AI/trasach.
+  Routing pozostaje not_configured do integracji modułu przez osobę AI.
+
+## Integracja zespołu
+
+Na tym branchu jest wyłącznie core B1 oraz wspólne szkielety FE/AI z main.
+Routery B2/AI montuj obok core_router w osobnym kroku integracji.
+Zachowaj lifespan i obsługę błędów. Klucze SecretStr czytaj przez get_secret_value().
+Kontraktu nie zmieniono. Klucze ORS i dostawcy AI nie są wymagane do pracy B1.
+
+## Weryfikacja
+
+Testy offline sprawdzają kontrakt, walidację, role, podpis JWT, limity i DST;
+repozytorium DB w testach API jest zastępowane fixture, więc nie dowodzą zapisów
+w rzeczywistej bazie. Zapytania SQL dodatkowo sprawdzane read-only w Supabase.
+Pełny test Auth/zapisów wymaga lokalnie uzupełnionego .env i danych seed B2.
+
+Aktualne źródła: [Supabase JWT](https://supabase.com/docs/guides/auth/jwts),
+[Psycopg](https://www.psycopg.org/psycopg3/docs/),
+[FastAPI testy](https://fastapi.tiangolo.com/tutorial/testing/),
+[PyJWT](https://pyjwt.readthedocs.io/en/stable/api.html).

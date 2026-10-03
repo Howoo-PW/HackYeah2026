@@ -1,5 +1,9 @@
 {
   "mcpServers": {
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=lsfpirkqdtjkcaujnsde&read_only=true"
+    },
     "context7": {
       "type": "http",
       "url": "https://mcp.context7.com/mcp"
