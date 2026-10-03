@@ -84,11 +84,17 @@ Dla `driving-car` i `cycling-regular` endpoint korzysta z grafu; `foot-walking` 
 - Błąd punktu pośredniego wskazuje jego indeks: `details.field = "via[0]"`.
 - Czas: każdy przystanek dodaje jedno wyszukiwanie na wariant (do ok. 1 s w najgorszym przypadku na darmowej bazie).
 
-Błędy: punkt dalej niż 600 m od sieci drogowej danego profilu → `404 NOT_FOUND` z `details.field` (`from`/`to`);
-brak trasy (np. ten sam punkt) → `404`; punkt poza Krakowem → `422 OUT_OF_AREA`; wagi poza 0–3 → `422`;
+Błędy: punkt dalej niż 600 m od sieci drogowej danego profilu → `404 NOT_FOUND` z `details.field` (`from`/`via[i]`/`to`);
+brak trasy (np. ten sam punkt) → `404`; punkt poza obsługiwanym obszarem → `422 OUT_OF_AREA`; wagi poza 0–3 → `422`;
 limit 30 żądań na minutę na IP (kontrakt, sekcja 9) → `429 RATE_LIMITED`. Za reverse proxy wszystkie żądania mają
 wtedy ten sam adres IP, więc przed produkcją trzeba skonfigurować prawdziwy adres klienta.
-Limit 600 m jest celowo luźny: strefa piesza Starego Miasta leży ok. 510 m od najbliższej drogi dla auta.
+Limit 600 m (`MAX_SNAP_M` w `routing/graph.py`) jest celowo luźny: strefy piesze w centrum leżą kilkaset metrów od
+najbliższej drogi dla auta.
+
+**Obszar działania jest w jednym miejscu**: granice obsługiwanego obszaru to stała w `backend/app/routing/geo.py`
+(sprawdzanie `OUT_OF_AREA`); nic innego w module tras nie zakłada konkretnego miasta. Dodając kolejne miasto, trzeba
+tam rozszerzyć obszar, załadować sieć OSM nowego obszaru (`scripts/load_osm_routing.py`) i przebudować graf
+(`select * from rebuild_routing();`).
 
 Health: `checks.routing` jest `ok`, gdy graf jest zbudowany (`routing_graph` niepusty) i skonfigurowany jest ORS dla
 pieszych; `not_configured` bez klucza ORS lub bez bazy; `error`, gdy grafu nie ma.

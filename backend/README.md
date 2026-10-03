@@ -44,7 +44,7 @@ nie przekazuj go do frontendu. Nie ma lokalnej bazy ani produkcyjnych mocków co
   Szczegóły i definicje pól: [docs/ROUTING_GRAPH.md](../docs/ROUTING_GRAPH.md).
 - Opcjonalne `via` (do 5 punktów pośrednich, w kolejności) działa dla wszystkich profili; pole nie jest jeszcze w kontrakcie.
 - Piesi: OpenRouteService (`routing/providers.py`) albo mock bez klucza; ocena tras po przykładowych segmentach.
-- Limit 30 żądań/min na IP, punkty poza Krakowem 422, punkt dalej niż 600 m od drogi 404.
+- Limit 30 żądań/min na IP; punkt poza obsługiwanym obszarem 422; punkt dalej niż 600 m od drogi 404.
 - Testy: `tests/test_graph_routing.py` (offline) i `tests/test_graph_db.py` (opcjonalnie, `RUN_DB_TESTS=1`,
   prawdziwa baza, tylko odczyty).
 
