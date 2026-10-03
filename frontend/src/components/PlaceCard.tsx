@@ -43,7 +43,7 @@ export default function PlaceCard({ place, onRoute, onShowRatings, onClose }: Pr
           onClick={onRoute}
           className="flex-1 rounded-full bg-gray-900 py-2 text-sm font-semibold text-white transition hover:bg-gray-700"
         >
-          🧭 Trasa
+          Trasa
         </button>
         <button
           onClick={showRatings}
