@@ -29,7 +29,8 @@ Stan i TODO tutaj oraz w overview i dziennik B2. Nie edytuj kontraktu przy okazj
 
 - 2026-10-05, db/routing-graph: graf tras w bazie (`routing_edges/nodes`, `routing_graph`,
   `find_route`, `rebuild_routing`), koszt z wag użytkownika; opis w docs/ROUTING_GRAPH.md.
-  Auto 96,5%, rower 96,2% w największej silnie spójnej składowej.
+  Auto 96,5%, rower 96,2% w największej silnie spójnej składowej. `routing_snap` (2026-10-05):
+  najbliższy węzeł i odległość, używane przez backend do odrzucania punktów > 600 m od drogi.
 
 ## TODO
 

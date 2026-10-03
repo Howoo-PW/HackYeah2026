@@ -1,4 +1,5 @@
-"""POST /route: mock provider end to end, ORS client against a fake transport, and scoring."""
+"""POST /route for pedestrians (external provider path): mock provider end to end, ORS client against a fake
+transport, and scoring. Cars and bikes use the own graph, see test_graph_routing.py."""
 
 import httpx
 import pytest
@@ -19,7 +20,7 @@ WAWEL = {"lat": 50.0540, "lon": 19.9353}
 
 
 def route(weights=None, **overrides):
-    body = {"from": RYNEK, "to": WAWEL, "profile": "driving-car", "weights": weights or {}, **overrides}
+    body = {"from": RYNEK, "to": WAWEL, "profile": "foot-walking", "weights": weights or {}, **overrides}
     return client.post("/api/v1/route", json=body)
 
 

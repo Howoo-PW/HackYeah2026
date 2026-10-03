@@ -21,6 +21,10 @@ Najpierw project-overview i docs/CONTRACT.md. API /api/v1; OpenAPI /docs.
 - app/rate_limit.py: współdzielony Redis i atomowy Lua; Memory wyłącznie w testach.
   Compose używa redis:6379, lokalne skrypty localhost:16379.
 
+- app/routing/: `router.py` POST /route (limit 30/min na IP); `graph.py` auto i rower z własnego
+  grafu w bazie (`find_route`, `routing_snap`, wagi użytkownika; opis w docs/ROUTING_GRAPH.md);
+  `providers.py` ORS/mock tylko dla pieszych; `scoring.py`, `segments.py` ocena tras pieszych.
+
 Wstawiaj routery B2/AI obok core_router; nie kopiuj ich implementacji.
 Ocena: unique(user_id,segment_id,rated_on); advisory lock i UPSERT w jednej
 transakcji. rated_on i domyślna pora dnia według Europe/Warsaw, daty API UTC.
@@ -46,9 +50,14 @@ Dokumentacja: Context7, oficjalne Supabase/FastAPI/Psycopg/PyJWT.
 - 22 plany zapytań SQL sprawdzone na online Supabase; obraz Docker Python 3.12
   zbudowany i test API w kontenerze PASS. Pełna integracja wymaga kluczy w .env.
 
+- 2026-10-05, backend/graph-routing: POST /route dla auta i roweru z własnego grafu (rank 1 wg wag
+  użytkownika, rank 2 najszybsza), limit 30/min na IP, snap max 600 m, health routing sprawdza graf.
+  Testy: offline test_graph_routing.py i opcjonalny test_graph_db.py (RUN_DB_TESTS=1).
+
 ## TODO
 
 - backend/b1-howoo: test pełnej integracji na .env zespołu i rzeczywistym JWT.
-- backend/routing (AI): źródło segmentów PostGIS i rzeczywisty provider po konfiguracji.
+- Piesi: własny graf pieszy zamiast ORS/mocka (dane OSM dla chodników); wtedy usunąć provider i przykładowe segmenty.
+- Przeszkody, pora dnia i parkingi przy celu w koszcie grafu (B2); `score` bywa null: osobny PR do kontraktu.
 - Współdzielony limiter gotowy; produkcja wymaga chronionego dostępu do Redis.
 - B2: schemat/seed i odświeżanie segment_stats; B2/AI routery dodają właściciele.

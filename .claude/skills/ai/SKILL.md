@@ -25,6 +25,7 @@ Zmiany wspólnego kontraktu w osobnym PR.
 
 ## TODO
 
-- backend/routing: zastąpić przykładowe segmenty źródłem PostGIS i skonfigurować ORS.
+- backend/routing: auto i rower idą już z własnego grafu (docs/ROUTING_GRAPH.md); ORS i przykładowe
+  segmenty zostają tylko dla pieszych. Kalibrację kosztu (siła 8 auto / 3 rower) warto potwierdzić z AI.
 - backend/ai-integration: bezpieczny klient AI, cache i przeliczanie w tle.
 - Opcjonalnie analiza zdjęć dopiero po MVP i walidacji danych użytkownika.
