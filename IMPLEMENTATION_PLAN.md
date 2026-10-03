@@ -9,6 +9,7 @@
 | Frontend | React + Vite + **TypeScript** + **Tailwind CSS** (potwierdzone) |
 | Telefon | Frontend jako **PWA** (instalowalna na telefonie, geolokalizacja, układ mobile-first) |
 | Baza | Tylko **Supabase online (Postgres + PostGIS)**. Brak lokalnej bazy i trybu offline (potwierdzone) |
+| Projekt Supabase | `HackYeah2026`, ref `lsfpirkqdtjkcaujnsde`, region `eu-central-1`, Postgres 17. Na 2026-10-03: brak tabel, PostGIS 3.3.7 i pgRouting 3.4.1 dostępne, ale niewłączone (włącza migracja w `db/schema`) |
 | Zdjęcia | Zdjęcia użytkowników w **Supabase Storage**, w bazie tylko metadane (tabela `segment_photos`) |
 | Auto-routing | W zakresie: trasy z zewnętrznego silnika (OpenRouteService lub OSRM) i ranking wg naszych ocen (sekcja 4) |
 | Obszar | Tylko **Kraków**: bbox `49.967,19.792,50.126,20.217` (S,W,N,E) |
@@ -43,7 +44,8 @@ Stan gita na dziś (2026-10-03): katalog **nie jest repozytorium** — zawiera t
 ├── .env.example                  # lista zmiennych, bez wartości
 ├── docs/
 │   ├── CONTRACT.md               # wspólny kontrakt: API, typy, enumy, porty
-│   └── MAP_STACK.md              # biblioteki i usługi mapowe, limity, dokumentacja
+│   ├── MAP_STACK.md              # biblioteki i usługi mapowe, limity, dokumentacja
+│   └── journal/                  # dziennik pracy: FE.md, B1.md, B2.md, AI.md
 ├── .gitignore                    # .env, node_modules, __pycache__, dist
 ├── .claude/
 │   ├── settings.json             # bez atrybucji Claude w commitach/PR, hook SessionStart, uprawnienia

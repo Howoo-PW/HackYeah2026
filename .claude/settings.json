@@ -5,5 +5,19 @@
     "pr": "",
     "sessionUrl": false
   },
-  "enabledMcpjsonServers": ["context7"]
+  "enabledMcpjsonServers": ["context7"],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [".claude/hooks/session-start.mjs"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
 }

@@ -26,3 +26,4 @@ dist/
 .DS_Store
 Thumbs.db
 .idea/
+.claude/role.local.json
