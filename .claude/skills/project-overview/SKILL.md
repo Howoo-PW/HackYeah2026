@@ -44,14 +44,18 @@ Stan opisuje bieżący branch; nie oznaczaj cudzych zmian jako scalonych.
   wspólne błędy, limity, healthcheck DB; testy offline i diagnostyka środowiska.
 - Supabase online: tabele i RLS istnieją; sześć migracji B2 scalono z origin/main
   (93d01d9) do tego brancha. Seed pozostaje u B2.
-- Osobne branche origin/frontend/map, origin/ai/service, origin/backend/routing
-  mają implementacje swoich modułów; nie są scalone do tego brancha.
+- Branche origin/frontend/map, origin/ai/service i origin/backend/routing scalono
+  do backend/b1-howoo. Mapa, routing mock i AI mock działają lokalnie.
+- Współdzielone limity Redis, trwały wolumen i testy wielu klientów. GitHub Actions
+  sprawdza backend/AI/frontend. 70 testów backendu i 10 AI PASS; frontend build/lint PASS.
 
 ## TODO
 
-- backend/b1-howoo: uzupełnić .env; uruchomić Compose i test zapisu z rzeczywistym JWT.
+- backend/b1-howoo: sekrety DB/service_role i test rzeczywistego JWT/zapisów odroczone
+  na prośbę użytkownika. Kontenery demo działają; DB health=503 bez konfiguracji.
 - db/seed-krakow (B2): seed Krakowa i weryfikacja harmonogramu segment_stats.
 - backend/photos, backend/obstacles-parking (B2): moduły dodatkowe i Storage.
-- backend/routing, ai/service, backend/ai-integration (AI): scalić trasy/AI i dodać cache.
-- frontend/* (FE): scalić mapę, dodać Auth/formularze i PWA.
+- backend/ai-integration (AI): cache; routing mock wymienić na rzeczywisty provider
+  i źródło segmentów PostGIS. Serwis AI i routing już scalone.
+- frontend/* (FE): Auth/formularze i PWA; mapa już scalona.
 - setup/repo: ochrona main oraz uprawnienia wszystkich członków zespołu.

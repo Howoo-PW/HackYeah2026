@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     supabase_anon_key: SecretStr = SecretStr("")
     supabase_service_role_key: SecretStr = SecretStr("")
     supabase_db_url: SecretStr = SecretStr("")
+    redis_url: SecretStr = SecretStr("redis://localhost:16379/0")
     routing_provider: str = "ors"
     ors_api_key: SecretStr = SecretStr("")
 

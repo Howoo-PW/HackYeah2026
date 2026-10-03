@@ -115,6 +115,13 @@ def main() -> int:
     report(not empty, "Wymagane wartości konfiguracji", "Uzupełnij: " + ", ".join(empty))
 
     try:
+        from redis import Redis
+        with Redis.from_url(config.get("REDIS_URL", "redis://localhost:16379/0"), socket_connect_timeout=2, socket_timeout=2) as client:
+            report(client.ping(), "Redis — współdzielone limity")
+    except Exception:
+        report(False, "Redis — współdzielone limity", "Uruchom docker compose up -d redis")
+
+    try:
         import psycopg
         db_url = config.get("SUPABASE_DB_URL")
         if not db_url:

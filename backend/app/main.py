@@ -12,7 +12,7 @@ from .config import settings
 from .core import router as core_router
 from .database import create_pool
 from .errors import install_error_handlers
-from .rate_limit import RateLimiter
+from .rate_limit import RedisRateLimiter
 from .routing.router import router as routing_router
 
 VERSION = "0.1.0"
@@ -29,11 +29,13 @@ async def lifespan(app: FastAPI):
     finally:
         if pool is not None:
             pool.close()
+        if isinstance(app.state.rate_limiter, RedisRateLimiter):
+            app.state.rate_limiter.close()
 
 
 app = FastAPI(title="Rate Your Ride API", version=VERSION, lifespan=lifespan)
 app.state.db_pool = None
-app.state.rate_limiter = RateLimiter()
+app.state.rate_limiter = RedisRateLimiter(settings.redis_url.get_secret_value())
 install_error_handlers(app)
 app.add_middleware(
     CORSMiddleware,

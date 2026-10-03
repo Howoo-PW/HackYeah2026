@@ -1,69 +1,46 @@
-# B1 — analiza i przekazanie pracy
+# B1 ? wykonanie i dalsza konfiguracja
 
-2026-10-03. Branch użytkownika: `backend/b1-howoo`, oparty na `origin/main`
-z migracjami B2 (`93d01d9`). Zmiany B1 pozostają w katalogu roboczym.
+Branch u?ytkownika: `backend/b1-howoo`. Pierwszy commit B1: `4bfdf0a`.
+Zintegrowano `origin/ai/service`, `origin/backend/routing`, `origin/frontend/map`
+oraz migracje B2 obecne w `origin/main`. G??wny branch pozostaje bez zmian B1.
 
-## Analiza branchy
+## Zrealizowane kroki
 
-| Branch zdalny | Stan | Znaczenie dla B1 |
-|---|---|---|
-| main | Szkielety usług, kontrakt, scalony db/schema | Baza osobnego brancha B1 |
-| setup/docker | Szkielety Docker/Compose | Uzupełniono healthchecki i diagnostykę |
-| db/schema | Migracje B2, już scalone do main | Backend pasuje do rzeczywistego schematu |
-| frontend/map | Mapa, kolorowanie, filtry, panel | Osobny branch FE; integracja przez kontrakt |
-| ai/service | Podsumowania, tryb mock/model, analiza nawierzchni | Osobny branch AI |
-| backend/routing | ORS/mock, ranking tras i testy | Osobny branch AI; wymaga połączenia Settings/routerów |
+| Punkt | Wynik |
+|---|---|
+| 1. Konfiguracja | Klucze publiczne Supabase pobrane przez plugin do ignorowanego .env; INTERNAL_API_KEY wygenerowany. Has?o DB i service_role odroczone na pro?b? u?ytkownika. |
+| 2. Uruchomienie | Redis, mapa, backend i AI uruchomione w kontenerach; frontend korzysta z fallbacku demo, AI i routing z mock?w. Seed online pozostaje do wykonania po wskazaniu konta Supabase. |
+| 3. Testy | 70 test?w backendu, 10 AI, frontend build i lint PASS. Routing HTTP zwraca 3 trasy, AI podsumowuje 5 komentarzy. Realny JWT i zapisy DB odroczone bez sekret?w. |
+| 4. MCP | Context7 initialize/tools/list PASS; Supabase plugin dzia?a. Bezpo?redni endpoint Supabase MCP odpowiada 401 i wymaga osobistego OAuth. |
+| 5. Integracja branchy | FE, AI, routing i migracje B2 po??czone na branchu B1; zachowano core, JWT, transakcje i error handlers. |
+| 6. Wiele proces?w | Wsp??dzielony limiter Redis z atomowym Lua, TTL i trwa?ym wolumenem; sprawdzono r?wnoczesne pr?by dw?ch klient?w. Routing 30/min na IP. |
+| 7. Ochrona main | Dodano GitHub Actions: backend, AI, frontend. Konfiguracja administracyjna ochrony main sprawdzana osobno. |
 
-Wszystkie branche pobrane jako origin/*. B1 realizuje swoje zadania na jednym
-osobnym branchu użytkownika zgodnie z jego poleceniem. Kod pozostałych ról poza
-scalonymi migracjami pozostaje na ich branchach.
+## Dost?p lokalny
 
-## Wykonane B1
+- Mapa: http://localhost:5173
+- Dokumentacja API: http://localhost:8000/docs
+- AI health: http://localhost:8001/health
+- Redis tego projektu: localhost:16379 (port 6379 zaj?ty przez inn? us?ug?).
 
-- JWT Supabase ES256/RS256 (JWKS) i HS256 (Auth API), profile /me i rola admin.
-- Odcinki GeoJSON, bbox i filtry, limit 2000, najbliższy odcinek <=50 m,
-  szczegóły wraz z ocenami wg pory dnia, przeszkodami i liczbą widocznych zdjęć.
-- Oceny 1–5; domyślna pora dnia i dzień wg Warszawy; atomowy UPSERT 201/200.
-- Widoczne komentarze, paginacja, dodawanie, moderacja admin i usuwanie cache AI.
-- Limity prób zapisu, walidacja Pydantic, błędy zgodne z kontraktem, CORS.
-- Pula DB z SSL, timeout i transakcjami kończonymi przed odpowiedzią HTTP.
-- Health DB/AI/konfiguracji tras, Compose healthcheck wszystkich usług.
-- CLAUDE.md, pięć skilli Stan/TODO, naprawiony hook SessionStart i lokalna rola B1.
-- MCP Supabase read-only, verify_env.py, skrypt administratora tylko dla dev.
-- Lokalny .env przygotowany z szablonu, z wygenerowanym INTERNAL_API_KEY.
-  Pozostałe klucze i hasło DB uzupełnia się lokalnie; plik ignorowany przez git.
+Backend dzia?a, ale jego health poprawnie zwraca HTTP 503/down bez
+SUPABASE_DB_URL. Frontend pokazuje dane demonstracyjne, nie dane online.
+Przy normalnym starcie Compose frontend czeka na zdrow? baz?; tryb demo
+uruchomiono osobnym `docker compose up -d --no-deps frontend`.
 
-## Weryfikacja
+## Brakuj?ce dane
 
-- 45 testów API/JWT/walidacji/uprawnień/limitów/czasu: PASS.
-- pip check oraz kompilacja Python: PASS.
-- 22 faktyczne zapytania Repository: EXPLAIN na online Supabase, PASS.
-  Plany INSERT/UPDATE/DELETE sprawdzono bez wykonywania zapisów.
-- Publiczny odczyt odcinków i GeoJSON/PostGIS oraz dzień lokalny Warszawy:
-  sprawdzone read-only w Supabase.
-- Hook Node rozpoznaje Howoo/B1; obsługuje plik roli UTF-8 z BOM na Windows.
-- Docker Desktop uruchomiony, Compose config --quiet: PASS.
-- Docker Compose build backend (Python 3.12): PASS.
-- Test API w kontenerze: OpenAPI 200, brak tokenu 401, brak DB health 503 — PASS.
+U?ytkownik wybra? kontynuowanie bez kluczy. Do pe?nej integracji potrzebne s?:
 
-Testy API używają fixture repozytorium. EXPLAIN sprawdza schemat i plan, lecz
-nie potwierdza realnego UPSERTu, współbieżności ani zapisu z tokenem użytkownika.
-Te próby wymagają SUPABASE_DB_URL, konta Auth i odcinków seed.
+- SUPABASE_DB_URL: adres poolera PostgreSQL z has?em, SSL wymagany.
+- SUPABASE_SERVICE_ROLE_KEY: tylko backend/Storage i skrypt administratora.
+- Konto dev do test?w: DEV_ADMIN_EMAIL i DEV_ADMIN_PASSWORD w lokalnym .env.
+- Dla prawdziwych tras: ROUTING_PROVIDER=ors i ORS_API_KEY; obecnie mock.
 
-## Dalej
+Plugin Supabase udost?pnia klucze publiczne, nie has?o DB ani service_role.
+Oba podpi?te konta (Supabase i Primary) widz? ten sam projekt; przed zapisami
+narz?dzia wymagaj? wskazania konta. Nie zmieniano zdalnych danych ani Auth.
 
-1. Uzupełnić lokalny .env: klucze projektu Supabase, URL poolera z hasłem DB,
-   VITE_SUPABASE_ANON_KEY i ewentualnie ORS_API_KEY. Nie wklejać sekretów do czatu.
-2. B2 seeduje Kraków. Uruchomić python scripts/verify_env.py --start.
-3. Sprawdzić prawdziwe logowanie, zapis oceny 201 i zastąpienie 200, komentarz,
-   uprawnienia moderacji i widoczność świeżych statystyk na mapie.
-4. W Claude Code /mcp: OAuth Supabase i weryfikacja Context7. Skonfigurowane MCP
-   w repo i dostęp przez plugin w tej sesji są osobnymi połączeniami.
-5. Połączyć branche FE/AI/B2. Przy scalaniu backend/routing nie nadpisywać core,
-   lifespan, pól Supabase ani error handlers; ORS key w Settings to SecretStr.
-6. Zastąpić limiter magazynem współdzielonym przed uruchomieniem wielu workerów.
-7. Właściciel repo ustawia ochronę main w GitHub. Dostępne narzędzia pluginu GitHub
-   w tej sesji pozwalają na odczyt, nie na zmianę ustawień administracyjnych repo.
-
-Kontrakt pozostał bez zmian. Nie utworzono administratora ani danych w online
-Supabase. Nie wykonano commita ani push zmian B1; publikacja według reguł CLAUDE.md.
+Po uzupe?nieniu sekret?w: `python scripts/verify_env.py --start`, seed B2,
+pr?ba loginu, ocena 201/200, komentarz, moderacja i od?wie?enie mapy.
+Kontrakt API pozosta? bez zmian. Sekrety i rola lokalna s? ignorowane przez git.

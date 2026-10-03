@@ -2,8 +2,9 @@
 
 from functools import lru_cache
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from shapely.geometry import LineString
+from starlette.concurrency import run_in_threadpool
 
 from ..errors import AppError
 from .geo import in_krakow
@@ -32,9 +33,13 @@ def get_segment_source() -> SegmentSource:
 @router.post("/route", response_model=RouteResponse)
 async def route(
     req: RouteRequest,
+    request: Request,
     provider: RouteProvider = Depends(get_provider),
     segments: SegmentSource = Depends(get_segment_source),
 ) -> RouteResponse:
+    """Rank alternatives under a shared 30-per-minute quota for the client IP."""
+    client_ip = request.client.host if request.client else "unknown"
+    await run_in_threadpool(request.app.state.rate_limiter.check, client_ip, "route", 30, window=60)
     for name, point in (("from", req.from_), ("to", req.to)):
         if not in_krakow(point.lat, point.lon):
             raise AppError(422, "OUT_OF_AREA", "Point is outside Kraków", {"field": name})

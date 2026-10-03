@@ -8,11 +8,23 @@ from shapely.geometry import LineString
 from app.errors import AppError
 from app.main import app
 from app.routing.providers import OrsProvider
+from app.routing.providers import MockProvider
+from app.routing.router import get_provider
+from app.rate_limit import RateLimiter
 from app.routing.schemas import Point, RouteOut, Scores, Weights
 from app.routing.scoring import coverage, dimension_scores, overall_score, rank
 from app.routing.segments import InMemorySegmentSource, SegmentMatch
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def isolated_mock_routing():
+    """Keep tests independent of provider keys and limiter state in a developer .env."""
+    app.dependency_overrides[get_provider] = lambda: MockProvider()
+    app.state.rate_limiter = RateLimiter()
+    yield
+    app.dependency_overrides.pop(get_provider, None)
 
 RYNEK = {"lat": 50.0617, "lon": 19.9373}
 WAWEL = {"lat": 50.0540, "lon": 19.9353}
@@ -32,6 +44,14 @@ def test_without_weights_fastest_route_wins():
     assert [r["rank"] for r in routes] == [1, 2, 3]
     assert routes[0]["duration_s"] == min(r["duration_s"] for r in routes)
     assert set(routes[0]) == {"rank", "geometry", "distance_m", "duration_s", "score", "scores", "coverage", "segment_ids"}
+
+
+def test_route_quota_is_30_per_minute():
+    for _ in range(30):
+        assert route().status_code == 200
+    response = route()
+    assert response.status_code == 429
+    assert response.json()["error"]["code"] == "RATE_LIMITED"
 
 
 def test_views_weight_prefers_scenic_east_variant():

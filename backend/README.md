@@ -28,8 +28,9 @@ nie przekazuj go do frontendu. Nie ma lokalnej bazy ani produkcyjnych mocków co
 - Admin tylko z app_metadata, nigdy user_metadata. Zmiana roli w JWT staje się
   widoczna po odświeżeniu tokenu; frontend korzysta z Supabase Auth.
 - Oceny: 1 na użytkownika/odcinek/dzień Warszawy, atomowe zastąpienie 200/201.
-- Limity prób zapisu: 30 ocen/h i 10 komentarzy/h; limiter w jednym procesie.
-  Przy wielu workerach wymaga współdzielonego magazynu i nie przetrwa restartu.
+- Limity prób zapisu: 30 ocen/h i 10 komentarzy/h; routing 30/min na IP.
+  Atomowy limiter Redis współdzieli kwotę między procesami. Compose zachowuje
+  dane w wolumenie AOF. Lokalny REDIS_URL: redis://localhost:16379/0.
 - Statystyki ocen liczone na żywo; segment_stats i jego odświeżanie pozostają u B2.
 - Moderacja komentarza usuwa cache AI odcinka. Publiczny odczyt tylko visible.
 - Health zwraca 503/down przy braku DB, 200/degraded przy niedostępnym AI/trasach.
@@ -37,9 +38,9 @@ nie przekazuj go do frontendu. Nie ma lokalnej bazy ani produkcyjnych mocków co
 
 ## Integracja zespołu
 
-Routery B2 i AI montuj w main.py obok core_router. Preserve lifespan i obsługę
-błędów. origin/backend/routing dodaje własne Settings: po scaleniu zachowaj pola
-core oraz obsługę SecretStr (klucze przez get_secret_value()). Kontraktu nie zmieniono.
+Routing i serwis AI scalono z core. Kolejne routery B2 montuj obok core_router.
+Zachowaj lifespan i obsługę błędów. Klucze SecretStr czytaj przez get_secret_value().
+Kontraktu nie zmieniono. Mock routingu wybieraj jawnie przez ROUTING_PROVIDER=mock.
 
 ## Weryfikacja
 

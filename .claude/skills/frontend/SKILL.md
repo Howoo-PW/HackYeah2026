@@ -20,11 +20,12 @@ docs/journal/FE.md. Kontrakt zmieniaj w osobnym PR.
 
 ## Stan
 
-- Na tym branchu szkielet Vite. origin/frontend/map ma mapę, filtry i panel.
+- origin/frontend/map scalono: mapa, filtry i panel działają na localhost:5173.
+- Build i lint PASS. Bez DB frontend korzysta z oznaczonych danych demo.
 - Core B1 udostępnia kontrakt endpointów dla integracji FE.
 
 ## TODO
 
-- frontend/map: scalić mapę; frontend/auth-rating: Auth i formularze.
+- frontend/auth-rating: Auth i formularze.
 - frontend/routing: trasy i wagi; frontend/pwa: manifest/service worker/lokalizacja.
 - Sprawdzić interfejs i czytelne błędy na telefonie podczas próby demo.

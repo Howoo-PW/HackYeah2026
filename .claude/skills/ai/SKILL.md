@@ -20,11 +20,11 @@ Zmiany wspólnego kontraktu w osobnym PR.
 
 ## Stan
 
-- Na tym branchu szkielet /health; origin/ai/service ma /summarize i mock/model.
-- origin/backend/routing ma routing i ranking; nie scalono do backend/b1-howoo.
+- Serwis /summarize i routing scalone do backend/b1-howoo; kontenery działają w mock.
+- 10 testów AI PASS w kontenerze z LangChain; routing HTTP zwraca 3 alternatywy.
 
 ## TODO
 
-- ai/service, backend/routing: scalić implementacje z core B1; połączyć Settings.
+- backend/routing: zastąpić przykładowe segmenty źródłem PostGIS i skonfigurować ORS.
 - backend/ai-integration: bezpieczny klient AI, cache i przeliczanie w tle.
 - Opcjonalnie analiza zdjęć dopiero po MVP i walidacji danych użytkownika.

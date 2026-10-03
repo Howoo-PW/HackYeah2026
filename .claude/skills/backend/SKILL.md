@@ -18,7 +18,8 @@ Najpierw project-overview i docs/CONTRACT.md. API /api/v1; OpenAPI /docs.
 - app/repository.py: parametryzowane SQL; schemat B2; żadnego DDL.
 - app/core.py: endpointy B1; app/schemas.py: Pydantic zgodny z kontraktem.
 - app/errors.py: wspólny format błędów; bez wartości wejścia i sekretów.
-- app/rate_limit.py: limit per użytkownik i akcja w jednym procesie.
+- app/rate_limit.py: współdzielony Redis i atomowy Lua; Memory wyłącznie w testach.
+  Compose używa redis:6379, lokalne skrypty localhost:16379.
 
 Wstawiaj routery B2/AI obok core_router; nie kopiuj ich implementacji.
 Ocena: unique(user_id,segment_id,rated_on); advisory lock i UPSERT w jednej
@@ -39,7 +40,8 @@ Dokumentacja: Context7, oficjalne Supabase/FastAPI/Psycopg/PyJWT.
 
 - backend/b1-howoo: core API, JWT i moderacja, bounded pool i transakcje.
 - Walidacja Krakowa, limit 2000 odcinków, paginacja max 100, oceny całkowite 1–5.
-- 45 testów kontraktu, walidacji, JWT, uprawnień, limitów i pór dnia.
+- 70 testów core/routingu/Redis; test równoczesnych klientów sprawdza wspólną kwotę.
+- Routing scalony obok core; ORS jawnie wymaga klucza, mock wybierany konfiguracją.
 - scripts/verify_env.py i scripts/create_dev_admin.py (tylko APP_ENV=dev).
 - 22 plany zapytań SQL sprawdzone na online Supabase; obraz Docker Python 3.12
   zbudowany i test API w kontenerze PASS. Pełna integracja wymaga kluczy w .env.
@@ -47,7 +49,6 @@ Dokumentacja: Context7, oficjalne Supabase/FastAPI/Psycopg/PyJWT.
 ## TODO
 
 - backend/b1-howoo: test pełnej integracji na .env zespołu i rzeczywistym JWT.
-- backend/routing (AI): po scaleniu połączyć Settings i install_error_handlers,
-  zamiast nadpisywać core. Uzgodnić SecretStr dla ors_api_key (.get_secret_value()).
-- Przy wielu workerach zastąpić limiter w pamięci magazynem współdzielonym.
+- backend/routing (AI): źródło segmentów PostGIS i rzeczywisty provider po konfiguracji.
+- Współdzielony limiter gotowy; produkcja wymaga chronionego dostępu do Redis.
 - B2: schemat/seed i odświeżanie segment_stats; B2/AI routery dodają właściciele.
