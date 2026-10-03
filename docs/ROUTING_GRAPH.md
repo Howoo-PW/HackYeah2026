@@ -46,15 +46,58 @@ użytkowników) i `geom` (LineString zwrócony zgodnie z kierunkiem jazdy). Pust
 Punkty początku i końca są przyciągane do najbliższego węzła w największej silnie spójnej składowej sieci
 danego profilu (nie utkniesz na parkingu odciętym od reszty).
 
-### Co zrobić z wynikiem w `POST /route`
+### `POST /route` w backendzie (zrobione: `backend/app/routing/graph.py`)
 
-- `geometry` — sklej `geom` kolejnych wierszy w jeden LineString (końce się schodzą, sprawdzone).
-- `distance_m` = suma `length_m`; `duration_s` = suma `time_s`.
-- `scores` — średnie ważone długością krawędzi; `score` — ważona suma wg wag użytkownika.
-- `coverage` — udział długości krawędzi z `rated = true`.
-- `segment_ids` — niepuste, unikalne `segment_id`.
-- Dobrym wynikiem dla UI są dwie trasy: ta po wagach użytkownika oraz najszybsza (wszystkie wagi 0), żeby pokazać
-  ile czasu kosztuje lepsza trasa.
+Dla `driving-car` i `cycling-regular` endpoint korzysta z grafu; `foot-walking` nadal idzie przez ORS/mock.
+
+- **Trasy w odpowiedzi.** Bez wag: jedna trasa, najszybsza. Z wagami: **rank 1 = najlepsza trasa dla priorytetów
+  użytkownika**, **rank 2 = najszybsza** (pomijana, gdy to ta sama trasa), żeby UI pokazało, ile czasu kosztuje lepsza
+  trasa. Rank nie wynika z `score` (ten liczą tylko oceny, a koszt grafu także priory OSM), tylko z definicji.
+- `geometry` — geometrie krawędzi sklejone w jeden LineString (punkt wspólny dwóch krawędzi tylko raz). Linia zaczyna
+  się w węźle sieci najbliższym punktowi `from` (nie w nim samym) i kończy w węźle najbliższym `to`; marker
+  użytkownika rysuje frontend.
+- `distance_m` = suma długości krawędzi, `duration_s` = suma czasów (prędkości z OSM, bez korków).
+- `scores` — średnie ważone długością z **własnych ocen odcinków** (`segment_scores`, w tym szacunek z grupy);
+  wymiar, którego nikt nie ocenił na trasie, ma `null`. Priory z OSM (używane tylko do wyboru trasy) nie trafiają do
+  `scores`: nie udajemy ocen, których nikt nie wystawił.
+- `score` — średnia z wymiarów wybranych przez użytkownika, ważona jego wagami; ta sama reguła dla obu tras, więc
+  są porównywalne. Bez ocen na trasie `null`.
+- `coverage` — udział długości trasy na odcinkach, które mają wynik.
+- `segment_ids` — wszystkie odcinki, przez które biegnie trasa (także nieocenione: frontend może zachęcić do oceny).
+- Krawędź jest dopasowana do **jednego** odcinka (najbliższego jej środka), więc na długiej krawędzi obejmującej kilka
+  odcinków liczy się wynik jednego z nich.
+
+**Żądanie** (pole `via` jest opcjonalne i **nie ma go jeszcze w `docs/CONTRACT.md`**, zmiana kontraktu idzie osobnym PR):
+
+```json
+{ "from": {"lat": 50.0668, "lon": 19.9341}, "to": {"lat": 50.0670, "lon": 19.9302},
+  "via": [{"lat": 50.0654, "lon": 19.9307}],
+  "profile": "driving-car",
+  "weights": {"surface": 2, "views": 0, "safety": 0, "traffic": 0, "parking": 0} }
+```
+
+- `via`: do 5 punktów pośrednich, trasa przechodzi przez nie w podanej kolejności (start → via[0] → … → koniec).
+  Każdy odcinek między dwoma przystankami szuka się osobno, a wyniki skleja w jedną trasę. Przystanek, który wypada w tym
+  samym węźle co poprzedni, nie dodaje odcinka. Odpowiedź ma ten sam kształt co bez `via` (jedna linia, sumy
+  dystansu i czasu), więc frontend nie musi niczego zmieniać po swojej stronie.
+- Piesi z `via` dostają jedną trasę (ORS daje alternatywy tylko dla dwóch współrzędnych).
+- Błąd punktu pośredniego wskazuje jego indeks: `details.field = "via[0]"`.
+- Czas: każdy przystanek dodaje jedno wyszukiwanie na wariant (do ok. 1 s w najgorszym przypadku na darmowej bazie).
+
+Błędy: punkt dalej niż 600 m od sieci drogowej danego profilu → `404 NOT_FOUND` z `details.field` (`from`/`via[i]`/`to`);
+brak trasy (np. ten sam punkt) → `404`; punkt poza obsługiwanym obszarem → `422 OUT_OF_AREA`; wagi poza 0–3 → `422`;
+limit 30 żądań na minutę na IP (kontrakt, sekcja 9) → `429 RATE_LIMITED`. Za reverse proxy wszystkie żądania mają
+wtedy ten sam adres IP, więc przed produkcją trzeba skonfigurować prawdziwy adres klienta.
+Limit 600 m (`MAX_SNAP_M` w `routing/graph.py`) jest celowo luźny: strefy piesze w centrum leżą kilkaset metrów od
+najbliższej drogi dla auta.
+
+**Obszar działania jest w jednym miejscu**: granice obsługiwanego obszaru to stała w `backend/app/routing/geo.py`
+(sprawdzanie `OUT_OF_AREA`); nic innego w module tras nie zakłada konkretnego miasta. Dodając kolejne miasto, trzeba
+tam rozszerzyć obszar, załadować sieć OSM nowego obszaru (`scripts/load_osm_routing.py`) i przebudować graf
+(`select * from rebuild_routing();`).
+
+Health: `checks.routing` jest `ok`, gdy graf jest zbudowany (`routing_graph` niepusty) i skonfigurowany jest ORS dla
+pieszych; `not_configured` bez klucza ORS lub bez bazy; `error`, gdy grafu nie ma.
 
 ## Obiekty w bazie
 
@@ -65,6 +108,7 @@ danego profilu (nie utkniesz na parkingu odciętym od reszty).
 | `routing_edge_dims` (widok) | oceny krawędzi: oceny → priory OSM → 3 |
 | `routing_graph` (widok mat.) | wszystko do liczenia kosztu w jednej tabeli; odświeżany z ocenami co 2 min |
 | `find_route(...)` | wyszukiwanie trasy wg wag |
+| `routing_snap(profil, lon, lat)` | najbliższy węzeł sieci i odległość do niego (backend odrzuca punkty > 600 m od drogi) |
 | `rebuild_routing()` | pełna przebudowa po ponownym imporcie OSM (topologia + `routing_graph`) |
 
 Spójność (silna, z kierunkami): auto 96,5%, rower 96,2% długości w jednej składowej.
@@ -77,6 +121,12 @@ wokół Rynku).
 Free-tier Supabase: typowa trasa autem ok. 0,4 s, rower przez całe miasto ok. 1,1 s. Zapytanie szuka najpierw
 w korytarzu wokół punktów, a przy braku trasy w całej sieci. Algorytm: `pgr_bddijkstra` (dokładny; dwukierunkowy
 A* dał w teście inną trasę, więc nie jest używany).
+
+## Testy
+
+`backend/tests/test_graph_routing.py` (offline, atrapy bazy): sklejanie geometrii, średnie ważone, coverage, ranking,
+błędy, limit żądań, mapowanie wierszy z bazy. `backend/tests/test_graph_db.py` (opcjonalnie, prawdziwa baza, tylko
+odczyty): `RUN_DB_TESTS=1 python -m pytest -c backend/pytest.ini backend/tests/test_graph_db.py`.
 
 ## Czego graf jeszcze nie robi
 
