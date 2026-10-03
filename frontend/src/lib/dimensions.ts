@@ -1,4 +1,4 @@
-import type { Dimension } from '../api/types'
+import type { Dimension, Scores } from '../api/types'
 
 /** Bounding box of Kraków (contract section 2): minLon,minLat,maxLon,maxLat. */
 export const KRAKOW_BBOX: [number, number, number, number] = [19.792, 49.967, 20.217, 50.126]
@@ -25,4 +25,26 @@ export function scoreColor(score: number | null): string {
   if (score === null) return NO_DATA_COLOR
   const i = Math.min(4, Math.max(0, Math.round(score) - 1))
   return SCORE_COLORS[i]
+}
+
+/** What the map is colored by and what the min-score filter applies to: one dimension or the overall mean. */
+export type Metric = Dimension | 'overall'
+
+export const METRICS: { id: Metric; label: string; low: string; high: string }[] = [
+  { id: 'overall', label: 'Ogólna', low: 'słabo', high: 'świetnie' },
+  ...DIMENSIONS,
+]
+
+/**
+ * Overall score: mean of the dimensions that have a score, null when nothing is rated.
+ * Computed on the client for display and filtering only; the contract has no such field.
+ */
+export function overallScore(scores: Scores): number | null {
+  const vals = Object.values(scores).filter((v): v is number => v !== null)
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null
+}
+
+/** Score of a segment for the chosen metric. */
+export function metricScore(scores: Scores, metric: Metric): number | null {
+  return metric === 'overall' ? overallScore(scores) : scores[metric]
 }

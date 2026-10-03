@@ -1,5 +1,5 @@
 // Mock data shaped like the examples in docs/CONTRACT.md. Used when the backend is unreachable.
-import type { Bbox, Scores, SegmentCollection, SegmentDetail, SegmentProperties } from './types'
+import type { Bbox, Opinion, Paginated, Rating, Scores, Summary, SegmentCollection, SegmentDetail, SegmentProperties } from './types'
 
 // A few streets around the Old Town as [lon, lat] polylines, split into short segments below.
 const STREETS: { name: string; highway: string; coords: [number, number][] }[] = [
@@ -63,6 +63,21 @@ export function mockSegments(bbox: Bbox): SegmentCollection {
   return { type: 'FeatureCollection', features }
 }
 
+// Placeholder until the AI service is wired in (branch backend/ai-integration).
+const MOCK_SUMMARY: Summary = {
+  surface: 'Nawierzchnia w większości nowa, ale przy skrzyżowaniach pojawiają się dziury.',
+  views: 'Użytkownicy chwalą widoki na Wawel i Wisłę.',
+  safety: 'Wieczorem brakuje oświetlenia, część osób czuje się niepewnie.',
+  traffic: 'Rano spokojnie, po południu korki.',
+  parking: 'Trudno zaparkować, zwłaszcza w weekendy.',
+  overall: 'Ładna trasa z dobrą nawierzchnią, ale wieczorem zatłoczona i słabo oświetlona.',
+  confidence: 'medium',
+  conflicts: ['Jedni opisują nawierzchnię jako gładką, inni zgłaszają dziury przy skrzyżowaniu.'],
+  comments_count: 5,
+  model: 'mock',
+  updated_at: '2026-09-30T12:00:00Z',
+}
+
 export function mockSegmentDetail(id: number): SegmentDetail | null {
   const f = ALL.find((s) => s.properties.id === id)
   if (!f) return null
@@ -77,9 +92,58 @@ export function mockSegmentDetail(id: number): SegmentDetail | null {
     lit: true,
     last_rating_at: p.ratings_count > 0 ? '2026-09-28T17:10:00Z' : null,
     scores_by_time_of_day: { morning: p.scores, day: p.scores, evening: empty, night: empty },
-    summary: null,
+    summary: p.ratings_count >= 5 ? MOCK_SUMMARY : null,
     obstacles: [],
     photos_count: 0,
     my_rating: null,
   }
+}
+
+const MOCK_TEXTS = [
+  'Nowy asfalt od mostu, ale wieczorem korki.',
+  'Piękny widok na Wawel, ale dziury przy skrzyżowaniu.',
+  'Rano spokojnie, polecam na rower.',
+  'Brakuje oświetlenia po zmroku, czuć się niepewnie.',
+  'Trudno zaparkować, szczególnie w weekendy.',
+]
+
+/** Deterministic mock opinions (3–5 per rated segment) with the author's own rating and votes. */
+export function mockComments(segmentId: number, page: number, pageSize: number): Paginated<Opinion> {
+  const seg = ALL.find((s) => s.properties.id === segmentId)
+  const total = seg && seg.properties.ratings_count > 0 ? 3 + (segmentId % 3) : 0
+  const times = ['morning', 'day', 'evening', 'night'] as const
+  const all: Opinion[] = Array.from({ length: total }, (_, i) => {
+    const seed = segmentId * 10 + i
+    const score = (salt: number) => {
+      const v = pseudo(seed, salt)
+      return v === null ? null : Math.round(v)
+    }
+    const created_at = new Date(Date.UTC(2026, 8, 28 - i * 3, 17, 10)).toISOString()
+    const rating: Rating = {
+      id: `mock-rating-${seed}`,
+      segment_id: segmentId,
+      surface: score(1) ?? 3,
+      views: score(2),
+      safety: score(3),
+      traffic: score(4),
+      parking: score(5),
+      time_of_day: times[seed % 4],
+      created_at,
+    }
+    return {
+      id: `mock-${segmentId}-${i}`,
+      segment_id: segmentId,
+      author: { id: `mock-user-${i}`, display_name: ['Ania', 'Marek', 'Kasia', 'Tomek', 'Ola'][(segmentId + i) % 5] },
+      text: MOCK_TEXTS[(segmentId + i) % MOCK_TEXTS.length],
+      status: 'visible',
+      created_at,
+      rating,
+      author_opinions_count: 1 + (seed % 12),
+      likes: seed % 9,
+      dislikes: seed % 3,
+      my_vote: null,
+    }
+  })
+  const start = (page - 1) * pageSize
+  return { items: all.slice(start, start + pageSize), page, page_size: pageSize, total }
 }

@@ -6,8 +6,9 @@ import { setWorkerUrl } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { fetchSegments } from '../api/client'
-import type { Bbox, Dimension, SegmentCollection } from '../api/types'
-import { KRAKOW_BBOX, KRAKOW_CENTER, NO_DATA_COLOR, SCORE_COLORS } from '../lib/dimensions'
+import type { Bbox, SegmentCollection } from '../api/types'
+import { KRAKOW_BBOX, KRAKOW_CENTER, NO_DATA_COLOR, SCORE_COLORS, metricScore } from '../lib/dimensions'
+import type { Metric } from '../lib/dimensions'
 import type { SegmentFilter } from '../api/client'
 
 // MapLibre 6 needs the worker file URL explicitly under Vite (docs/MAP_STACK.md).
@@ -18,7 +19,7 @@ const MAP_STYLE = 'https://tiles.openfreemap.org/styles/positron'
 const MIN_FETCH_ZOOM = 13
 
 type Props = {
-  dimension: Dimension
+  dimension: Metric
   filter: SegmentFilter
   selectedId: number | null
   onSelect: (id: number | null) => void
@@ -97,7 +98,7 @@ export default function MapView({ dimension, filter, selectedId, onSelect, onSta
       ...data,
       features: data.features.map((f) => ({
         ...f,
-        properties: { ...f.properties, score: f.properties.scores[dimension] },
+        properties: { ...f.properties, score: metricScore(f.properties.scores, dimension) },
       })),
     }
   }, [data, dimension])

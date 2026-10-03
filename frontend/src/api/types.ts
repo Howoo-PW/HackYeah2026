@@ -57,6 +57,30 @@ export type Summary = {
   updated_at: string
 }
 
+export type Comment = {
+  id: string
+  segment_id: number
+  author: { id: string; display_name: string }
+  text: string
+  status: ContentStatus
+  created_at: string
+}
+
+/**
+ * Comment extended with the author's own rating and votes, as shown in the opinions list.
+ * NOT IN docs/CONTRACT.md YET: the contract's `Comment` has no rating link and there is no vote endpoint.
+ * Needs a contract PR (B1 + FE) before the real backend can return it; until then it comes from mocks.
+ */
+export type Opinion = Comment & {
+  rating: Rating | null
+  author_opinions_count: number
+  likes: number
+  dislikes: number
+  my_vote: 'up' | 'down' | null
+}
+
+export type Paginated<T> = { items: T[]; page: number; page_size: number; total: number }
+
 export type SegmentDetail = SegmentProperties & {
   geometry: LineString
   surface_osm: string | null
