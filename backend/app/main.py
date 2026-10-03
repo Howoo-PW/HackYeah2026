@@ -13,6 +13,7 @@ from .core import router as core_router
 from .database import create_pool
 from .errors import install_error_handlers
 from .rate_limit import RateLimiter
+from .routing.router import router as routing_router
 
 VERSION = "0.1.0"
 
@@ -43,6 +44,7 @@ app.add_middleware(
 
 api = APIRouter(prefix="/api/v1")
 api.include_router(core_router)
+api.include_router(routing_router)
 
 
 async def _check_ai() -> str:

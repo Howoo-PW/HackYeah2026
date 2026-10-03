@@ -5,3 +5,4 @@ httpx==0.28.1
 PyJWT[crypto]==2.15.0
 psycopg[binary,pool]==3.3.3
 tzdata==2026.1
+shapely==2.1.2
