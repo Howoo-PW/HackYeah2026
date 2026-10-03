@@ -12,6 +12,12 @@ export const DIMENSIONS: { id: Dimension; label: string; low: string; high: stri
   { id: 'parking', label: 'Parkingi', low: 'brak miejsc', high: 'łatwo zaparkować' },
 ]
 
+/**
+ * Dimensions that take part in route planning. Parking is rated and shown on the map, but routes are not
+ * planned around it, so it is left out of the route requirements, the request and the route's scores.
+ */
+export const ROUTE_DIMENSIONS = DIMENSIONS.filter((d) => d.id !== 'parking')
+
 /** 1 = worst, 5 = best everywhere (contract section 3). */
 export const SCORE_COLORS = ['#d7191c', '#fdae61', '#ffdf4d', '#a6d96a', '#1a9641']
 export const NO_DATA_COLOR = '#9ca3af'
