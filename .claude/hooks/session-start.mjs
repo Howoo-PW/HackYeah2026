@@ -28,7 +28,7 @@ if (existsSync(roleFile)) {
 
 const branch = git('branch --show-current') || '(brak)';
 const changes = git('status --short').split('\n').filter(Boolean).length;
-const lines = ['# Start sesji — Rate Your Ride', '',
+const lines = ['# Start sesji — Rate My Road', '',
   'Przed pracą przeczytaj .claude/skills/project-overview/SKILL.md, potem skill obszaru.',
   'Sprawdź git status i git fetch. Zaktualizuj Stan/TODO skilla i overview po zmianach.', ''];
 

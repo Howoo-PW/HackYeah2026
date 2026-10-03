@@ -1,4 +1,4 @@
-# Rate Your Ride — kontrakt wspólny
+# Rate My Road — kontrakt wspólny
 
 Ten plik jest **jedynym źródłem prawdy** dla wszystkiego, co łączy frontend, backend, bazę i serwis AI: endpointów, formatów danych, nazw, enumów, portów i zmiennych środowiskowych.
 

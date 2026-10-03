@@ -1,4 +1,4 @@
-# Rate Your Ride — stos mapowy
+# Rate My Road — stos mapowy
 
 Zweryfikowano 2026-10-03: wersje z npm i PyPI, zasady usług ze stron operatorów. Przed demo sprawdźcie limity jeszcze raz — operatorzy zmieniają je bez zapowiedzi.
 
@@ -78,7 +78,7 @@ Pominięte: `overpy` (ostatnia wersja 0.7, rzadko aktualizowany — wystarczy `h
 | **Nominatim** | Max 1 zapytanie/s; **zakaz podpowiedzi przy pisaniu**; własny User-Agent; wyniki trzeba cache'ować | Wyszukiwarka adresu tylko po Enter, przez backend z cache |
 
 Wspólne zasady:
-- Każde wywołanie z backendu ma nagłówek `User-Agent: RateYourRide/0.1 (kontakt: <email zespołu>)`.
+- Każde wywołanie z backendu ma nagłówek `User-Agent: RateMyRoad/0.1 (kontakt: <email zespołu>)`.
 - Klucze (`ORS_API_KEY`) tylko w `.env` backendu, nigdy w frontendzie.
 - Na produkcję (po hackathonie): własny serwer kafelków lub płatny dostawca, własny OSRM/ORS/GraphHopper z danymi Krakowa.
 

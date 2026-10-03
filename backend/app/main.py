@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
             app.state.rate_limiter.close()
 
 
-app = FastAPI(title="Rate Your Ride API", version=VERSION, lifespan=lifespan)
+app = FastAPI(title="Rate My Road API", version=VERSION, lifespan=lifespan)
 app.state.db_pool = None
 app.state.rate_limiter = RedisRateLimiter(settings.redis_url.get_secret_value())
 install_error_handlers(app)

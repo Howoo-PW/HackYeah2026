@@ -1,4 +1,4 @@
-# Rate Your Ride
+# Rate My Road
 
 Ocenianie odcinków dróg w Krakowie: nawierzchnia, widoki, bezpieczeństwo, ruch, parkingi. HackYeah 2026.
 

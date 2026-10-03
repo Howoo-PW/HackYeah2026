@@ -1,9 +1,9 @@
 ---
 name: project-overview
-description: Architektura, zasady współpracy i globalny stan projektu Rate Your Ride. Czytaj przed każdą pracą.
+description: Architektura, zasady współpracy i globalny stan projektu Rate My Road. Czytaj przed każdą pracą.
 ---
 
-# Rate Your Ride — overview
+# Rate My Road — overview
 
 Cel: oceny odcinków dróg Krakowa w pięciu wymiarach, mapa mobilna, komentarze,
 zdjęcia, AI i ranking tras. Każda ocena ma skalę 1–5; 5 zawsze oznacza najlepiej.

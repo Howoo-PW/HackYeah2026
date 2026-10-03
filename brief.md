@@ -1,4 +1,4 @@
-# Rate Your Ride — brief projektu
+# Rate My Road — brief projektu
 
 **Oceń drogi jak restauracje.**
 

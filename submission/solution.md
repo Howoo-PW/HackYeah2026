@@ -1,4 +1,4 @@
-Oceń drogi jak restauracje. Rate Your Ride to mapa dróg, na której użytkownicy oceniają odcinki dróg w pięciu wymiarach (nawierzchnia, widoki, bezpieczeństwo, ruch, parkingi) i piszą opinie ze zdjęciami. Mapa jest kolorowana według ocen, więc od razu widać, które drogi są dobre, a które złe. Sztuczna inteligencja streszcza komentarze, żeby nie trzeba było czytać kilkudziesięciu opinii. Trasę można wyznaczyć w trybie „unikaj złych dróg” albo „wybierz ładną”, z własnymi priorytetami.
+Oceń drogi jak restauracje. Rate My Road to mapa dróg, na której użytkownicy oceniają odcinki dróg w pięciu wymiarach (nawierzchnia, widoki, bezpieczeństwo, ruch, parkingi) i piszą opinie ze zdjęciami. Mapa jest kolorowana według ocen, więc od razu widać, które drogi są dobre, a które złe. Sztuczna inteligencja streszcza komentarze, żeby nie trzeba było czytać kilkudziesięciu opinii. Trasę można wyznaczyć w trybie „unikaj złych dróg” albo „wybierz ładną”, z własnymi priorytetami.
 
 Korzyści dla użytkownika: kierowca niskiego auta omija progi i dziury, motocyklista i rowerzysta wybierają ładne trasy, a każdy może polecić drogę, którą polubił.
 
