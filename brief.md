@@ -1,36 +1,57 @@
 # Rate Your Ride — brief projektu
 
+**Oceń drogi jak restauracje.**
+
 ## Problem
 
-Kierowcy, rowerzyści i motocykliści nie wiedzą, jak naprawdę wygląda droga, zanim nią pojadą. Nawigacje wybierają trasę wg czasu i dystansu, a pomijają to, co ważne w praktyce: stan nawierzchni, bezpieczeństwo, widoki, korki i dostępność parkingów. Informacje są rozproszone po forach i grupach w mediach społecznościowych, są nieaktualne i nie da się ich przeglądać na mapie. Zarządcy dróg nie mają taniego źródła danych o tym, gdzie jest najgorzej.
+Chyba każdy kierowca został kiedyś przez nawigację wyprowadzony na tak zwane „manowce”. Nawigacja wybiera trasę według czasu i dystansu, a to, co decyduje o jakości przejazdu, zostaje poza mapą:
+
+- **Parkowanie.** Nawigacja doprowadzi pod wskazany adres, ale okazuje się, że w promieniu kilku przecznic wszystkie miejsca są zajęte.
+- **Stan drogi.** Właściciel auta z niskim zawieszeniem musi zawracać przed nierówną nawierzchnią i zbyt wysokimi progami zwalniającymi.
+- **Bezpieczeństwo.** Nawigacja pokazuje aktualne zdarzenia, ale nie statystyki: nie wiadomo, gdzie wypadki zdarzają się codziennie.
+- **Przyjemność jazdy.** Motocyklista planuje przejażdżkę, a wybrana trasa jest nużąca. Nie ma sposobu, żeby poprosić o ładniejszą.
+- **Brak polecania.** Przejechałeś piękną drogę i chcesz ją polecić innym, ale zwykła nawigacja tego nie umożliwia.
+
+Wiedza o drogach istnieje, ale jest rozproszona po forach i grupach w mediach społecznościowych, szybko się starzeje i nie da się jej oglądać na mapie. Zarządcy dróg nie mają taniego źródła informacji o tym, gdzie jest najgorzej.
 
 ## Rozwiązanie
 
-Mapowa aplikacja, w której użytkownicy oceniają **odcinki dróg** (nie całe drogi) w kilku wymiarach:
+Mapowa aplikacja, w której użytkownicy oceniają **odcinki dróg** i opisują je komentarzem, tak jak restauracje w serwisach z opiniami. Oceny są w kilku wymiarach (skala 1–5):
 
 - jakość nawierzchni,
 - widoki z trasy,
 - bezpieczeństwo,
 - obciążenie ruchem i problemy na drodze,
 - dostępność parkingów,
-- opcjonalne szczegóły drogi (np. rodzaj nawierzchni, szerokość, oświetlenie).
+- opcjonalne szczegóły drogi (np. progi zwalniające, rodzaj nawierzchni, oświetlenie).
 
 Kluczowe funkcje:
 
-1. **Mapa kolorowana wg ocen** z filtrowaniem po wybranym wymiarze.
-2. **Komentarze użytkowników** przy odcinkach.
-3. **AI summary komentarzy**: krótkie podsumowanie opinii dla każdego odcinka, z oznaczeniem „wygenerowane przez AI" i dostępem do komentarzy źródłowych.
-4. **Zgłaszanie przeszkód**, np. remontów i zamkniętych odcinków.
+1. **Mapa kolorowana wg ocen** z filtrem wymiaru: od razu widać, które drogi są dobre, a które złe.
+2. **Oceny i opinie użytkowników** przy odcinkach, ze zdjęciami.
+3. **AI summary komentarzy**: krótkie podsumowanie opinii o odcinku, oznaczone jako wygenerowane przez AI, z dostępem do komentarzy źródłowych.
+4. **Zgłaszanie przeszkód**: remonty, zamknięcia, uszkodzenia.
+5. **Wyznaczanie trasy według ocen**: tryb „unikaj złych dróg” i tryb „wybierz ładną trasę”, z wagami wymiarów ustawianymi przez użytkownika.
+6. **Polecanie dróg**: ładny odcinek można ocenić i polecić innym.
 
 ## Czemu takie rozwiązanie
 
-- **Odcinki zamiast całych dróg**: jakość drogi zmienia się na długości, a ocena odcinka jest użyteczna.
-- **Oddzielne wymiary zamiast jednej oceny**: różni użytkownicy chcą czegoś innego (widoki vs. szybkość vs. parking).
-- **OpenStreetMap jako baza**: dane i mapa są darmowe, a licencja wymaga tylko atrybucji. Dzięki temu koszt startu jest bliski zera.
-- **AI summary**: nikt nie czyta 50 komentarzy, a podsumowanie daje wartość nawet przy małej liczbie ocen.
+- **Odcinki zamiast całych dróg**: jakość zmienia się na długości drogi, a ocena odcinka jest użyteczna.
+- **Oddzielne wymiary zamiast jednej oceny**: kierowca niskiego auta, motocyklista i osoba szukająca parkingu chcą czegoś innego.
 - **Crowdsourcing**: tylko użytkownicy wiedzą, jak droga wygląda dziś. Żadna płatna usługa nie da takich danych o widokach czy parkingach.
+- **Znany schemat**: oceny i opinie jak przy restauracjach nie wymagają tłumaczenia.
+- **OpenStreetMap jako baza**: dane i mapa są darmowe, a licencja wymaga tylko atrybucji. Koszt startu jest bliski zera.
+- **AI summary**: nikt nie czyta 50 komentarzy, a podsumowanie daje wartość nawet przy małej liczbie ocen.
 
-**Główne ryzyka:** zimny start (pusta mapa), fałszywe oceny, nieaktualne dane i prywatność lokalizacji. Odpowiedź: start w jednym mieście, dane początkowe z OSM, logowanie, limity i wygasanie starych ocen.
+**Główne ryzyka i odpowiedzi:**
+
+| Ryzyko | Odpowiedź |
+|---|---|
+| Zimny start: pusta mapa | Start w jednym mieście (Kraków), dane początkowe z OSM, kilkadziesiąt ocen dla demo |
+| Fałszywe oceny | Logowanie, limity, moderacja |
+| Nieaktualne dane | Wygasanie starych ocen, daty przy ocenach |
+| Prywatność lokalizacji | Zbieramy oceny odcinków, nie ślady przejazdów |
+| Limity darmowych usług map | Cache tras i zapytań, w razie potrzeby własny routing |
 
 ## Finansowanie
 
@@ -41,23 +62,24 @@ Koszty utrzymania są niskie i zależą głównie od liczby użytkowników:
 | Hosting bazy danych | darmowy plan na start, potem kilka–kilkadziesiąt USD/mies. |
 | Domena | ok. 50–100 zł/rok |
 | Mapa i dane (OSM) | 0 zł przy małym ruchu, potem hostowany dostawca kafelków |
-| AI summary | grosze za odcinek przy małym modelu, wyniki cache'owane |
+| Trasy | darmowy plan dostawcy na start (ma dzienny limit), potem własny serwer tras |
+| AI summary | niski koszt za odcinek przy małym modelu, wyniki cache'owane |
 
-Źródła finansowania na później (do weryfikacji): granty i konkursy dla projektów smart city, współpraca z zarządcami dróg i miastami (raporty o stanie dróg), opcjonalna wersja premium (zaawansowane filtry, routing), partnerstwa z klubami rowerowymi i motocyklowymi.
+Źródła finansowania na później (do weryfikacji): granty i konkursy dla projektów smart city, współpraca z zarządcami dróg i miastami (raporty o stanie dróg i statystyki), wersja premium (zaawansowane filtry, wyznaczanie tras), partnerstwa z klubami rowerowymi i motocyklowymi.
 
 ## Przyszłość
 
-- **Auto-routing** wg wybranych parametrów (np. „najlepsza nawierzchnia i widoki").
-- Pasywne zbieranie danych z czujników telefonu (wykrywanie dziur).
+- **Trasy optymalizowane po ocenach** na własnym grafie dróg (zamiast wybierania spośród kilku tras z zewnętrznego serwisu).
+- **Statystyki bezpieczeństwa**: miejsca zdarzeń drogowych z danych publicznych obok ocen użytkowników.
+- Pasywne zbieranie danych z czujników telefonu (wykrywanie dziur i progów).
 - Aplikacja mobilna i tryb offline.
 - Udostępnianie zagregowanych danych miastom i zarządcom dróg.
-- Rozszerzenie na kolejne miasta i kraje.
+- **Skalowanie z pilotażu na całą Europę:** Kraków to pilotaż, docelowo kolejne miasta i kraje (dane OpenStreetMap obejmują cały kontynent).
 
 ## Plan implementacji
 
-1. **Hackathon (MVP):** mapa OSM (Leaflet lub MapLibre) dla jednego miasta, podział dróg na odcinki, ocena 4–5 wymiarów, komentarze, kolorowanie z filtrem.
-2. **Po MVP:** AI summary komentarzy (w tle, cache), logowanie i moderacja, zgłaszanie remontów i przeszkód.
-3. **Kolejny etap:** wygasanie starych ocen, ocena wg pory dnia, ochrona przed nadużyciami.
-4. **Później:** auto-routing, aplikacja mobilna, dane z czujników.
+1. **Hackathon (MVP):** mapa OSM dla Krakowa, odcinki dróg, oceny i komentarze, kolorowanie z filtrem, podsumowania AI komentarzy, wyznaczanie tras z uwzględnieniem ocen.
+2. **Po MVP:** moderacja, zdjęcia, zgłaszanie przeszkód, wygasanie starych ocen, ocena wg pory dnia.
+3. **Później:** własny routing, aplikacja mobilna, dane z czujników, rozszerzenie z Krakowa na kolejne miasta i całą Europę.
 
-Dla demo na hackathonie: parking i ruch mogą być częściowo symulowane, ale trzeba to jasno zaznaczyć.
+Dla demo na hackathonie: część danych (parking, ruch, oceny odcinków) może pochodzić z przykładowego zestawu, ale trzeba to jasno zaznaczyć.
