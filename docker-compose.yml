@@ -1,0 +1,60 @@
+# Dev stack: frontend, backend and AI service with hot reload (code mounted from the repo).
+# Ports and service names follow docs/CONTRACT.md, section 8. Database = Supabase online.
+#   docker compose up --build
+x-python-dev: &python-dev
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    WATCHFILES_FORCE_POLLING: "true" # reload works with Windows bind mounts
+  restart: unless-stopped
+
+services:
+  ai:
+    <<: *python-dev
+    build: ./ai-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./ai-service/app:/app/app
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    <<: *python-dev
+    build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      WATCHFILES_FORCE_POLLING: "true"
+      AI_SERVICE_URL: http://ai:8000 # inside the Compose network
+    volumes:
+      - ./backend/app:/app/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      ai:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  frontend:
+    build: ./frontend
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # keep the container's node_modules, not the host's
+    ports:
+      - "5173:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
