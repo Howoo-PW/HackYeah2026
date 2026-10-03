@@ -369,13 +369,20 @@ Odpowiedź: `201`, `Photo`.
 {
   "from": { "lat": 50.0614, "lon": 19.9370 },
   "to": { "lat": 50.0470, "lon": 19.9440 },
+  "via": [{ "lat": 50.0540, "lon": 19.9353 }],
   "profile": "driving-car",
   "weights": { "surface": 2, "views": 1, "safety": 1, "traffic": 0, "parking": 0 }
 }
 ```
 
+- `via`: opcjonalne, do 5 punktów pośrednich; trasa przechodzi przez nie w podanej kolejności (od `from` do `to`).
+  Brak = `[]`. Każdy punkt musi leżeć w Krakowie (`422 OUT_OF_AREA`, `details.field` = `"via[0]"`, …).
+  Piesi (`foot-walking`) dostają przy `via` jedną trasę zamiast kilku alternatyw.
 - `profile`: `driving-car` / `cycling-regular` / `foot-walking`.
 - `weights`: 0–3 dla każdego wymiaru, brakujący = 0. Wszystkie 0 → sortowanie po czasie przejazdu.
+- Auto i rower: bez wag jedna trasa (najszybsza). Z wagami `rank: 1` to trasa najlepsza dla tych priorytetów, a `rank: 2`
+  najszybsza (pomijana, gdy to ta sama trasa). Punkt dalej niż 600 m od drogi danego profilu → `404 NOT_FOUND`
+  z `details.field` (`"from"`, `"via[i]"` lub `"to"`).
 
 ```json
 {
