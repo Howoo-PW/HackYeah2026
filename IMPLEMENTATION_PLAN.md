@@ -295,7 +295,7 @@ Szczegółowy stan i TODO prowadzone są w skillach (sekcja 6). Ten plan aktuali
 
 | Etap | Stan |
 |---|---|
-| 0. Przygotowanie | ⏳ do zrobienia |
+| 0. Przygotowanie | 🔄 kontrakt zatwierdzony 2026-10-03; zostaje ochrona `main` i dostęp do Supabase dla zespołu |
 | 1. Fundamenty | ⏳ |
 | 2. Dane | ⏳ |
 | 3. Backend i AI | ⏳ |

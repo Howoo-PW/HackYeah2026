@@ -12,10 +12,10 @@ Powiązane: [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md).
 
 | Osoba | Obszar | Zatwierdzone |
 |---|---|---|
-| FE | frontend | ☐ |
-| B1 | backend + infrastruktura | ☐ |
-| B2 | backend + baza danych | ☐ |
-| AI | serwis AI + backend | ☐ |
+| FE | frontend | ☑ 2026-10-03 |
+| B1 | backend + infrastruktura | ☑ 2026-10-03 |
+| B2 | backend + baza danych | ☑ 2026-10-03 |
+| AI | serwis AI + backend | ☑ 2026-10-03 |
 
 **Zmiana kontraktu po starcie:** osobny PR tylko z tym plikiem, akceptacja wszystkich osób, których dotyczy zmiana. Nie zmieniamy kontraktu „przy okazji” w PR-ze z kodem.
 
@@ -455,10 +455,10 @@ Nazwy zmiennych środowiskowych — lista w [IMPLEMENTATION_PLAN.md](../IMPLEMEN
 
 ## 10. Do ustalenia na spotkaniu
 
-- [ ] Skala i znaczenie wymiarów (sekcja 3)
-- [ ] Typy danych (sekcja 4)
-- [ ] Endpointy i przykłady (sekcja 5)
-- [ ] Kontrakt AI (sekcja 6)
-- [ ] Nazwy tabel i bucketu (sekcja 7)
-- [ ] Porty i zmienne (sekcja 8)
-- [ ] Limity (sekcja 9)
+- [x] Skala i znaczenie wymiarów (sekcja 3)
+- [x] Typy danych (sekcja 4)
+- [x] Endpointy i przykłady (sekcja 5)
+- [x] Kontrakt AI (sekcja 6)
+- [x] Nazwy tabel i bucketu (sekcja 7)
+- [x] Porty i zmienne (sekcja 8)
+- [x] Limity (sekcja 9)
