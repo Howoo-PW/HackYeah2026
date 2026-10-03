@@ -123,6 +123,30 @@ class Repository:
             {"type": "Feature", "geometry": row["geometry"], "properties": row} for row in rows
         ]}
 
+    def group_map(self, bbox, dimension=None, min_score=None, rated_only=False):
+        """Fragments in the viewport for zoomed-out maps (view fragment_map): the whole city is about 5 000."""
+        if min_score is not None and dimension not in DIMENSIONS:
+            raise AppError(422, "VALIDATION_ERROR", "min_score wymaga dimension")
+        conditions = ["geom && ST_MakeEnvelope(%s, %s, %s, %s, 4326)"]
+        params = [*bbox]
+        if rated_only:
+            conditions.append("source <> 'none'")
+        if min_score is not None:
+            conditions.append(f"{dimension} >= %s")  # dimension is validated against DIMENSIONS above
+            params.append(min_score)
+        rows = self.conn.execute(
+            "SELECT group_id AS id, name, highway, length_m, segments_count, ratings_count, source AS scores_source, "
+            "surface, views, safety, traffic, parking, ST_AsGeoJSON(geom, 5)::jsonb AS geometry "
+            "FROM public.fragment_map WHERE " + " AND ".join(conditions) + " ORDER BY group_id LIMIT 6001", params).fetchall()
+        if len(rows) > 6000:
+            raise AppError(422, "VALIDATION_ERROR", "Przybliż mapę: maksymalnie 6000 fragmentów")
+        features = []
+        for row in rows:
+            geometry = row.pop("geometry")
+            row["scores"] = {d: (round(row.pop(d), 2) if row[d] is not None else row.pop(d)) for d in DIMENSIONS}
+            features.append({"type": "Feature", "geometry": geometry, "properties": row})
+        return {"type": "FeatureCollection", "features": features}
+
     def nearest(self, lat: float, lon: float):
         """Find a road within 50 metres with geography distances in metres."""
         row = self.conn.execute(

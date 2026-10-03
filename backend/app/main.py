@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from .config import settings
@@ -37,6 +38,7 @@ app = FastAPI(title="Rate My Road API", version=VERSION, lifespan=lifespan)
 app.state.db_pool = None
 app.state.rate_limiter = RedisRateLimiter(settings.redis_url.get_secret_value())
 install_error_handlers(app)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,

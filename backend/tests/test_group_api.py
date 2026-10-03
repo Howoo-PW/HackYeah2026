@@ -85,6 +85,15 @@ class FakeGroupRepository:
             "type": "Feature", "geometry": {"type": "LineString", "coordinates": [[19.9, 50.0], [19.91, 50.0]]},
             "properties": enrich_segment(raw_row(group=agg(surface=(3, 12.0))))}]}
 
+    def group_map(self, bbox, dimension=None, min_score=None, rated_only=False):
+        self.last = (bbox, dimension, min_score, rated_only)
+        return {"type": "FeatureCollection", "features": [{
+            "type": "Feature",
+            "geometry": {"type": "MultiLineString", "coordinates": [[[19.9, 50.0], [19.91, 50.0]]]},
+            "properties": {"id": 7, "kind": "group", "name": "Długa", "highway": "residential", "length_m": 480.0,
+                           "segments_count": 6, "ratings_count": 3, "scores_source": "own",
+                           "scores": {"surface": 4.0, "views": None, "safety": None, "traffic": 2.5, "parking": None}}}]}
+
     def group(self, group_id):
         if group_id != 7:
             raise AppError(404, "NOT_FOUND", "Nie znaleziono grupy")
@@ -121,3 +130,24 @@ def test_unknown_group_is_not_found_in_contract_format(client):
     response = client.get("/api/v1/groups/99")
     assert response.status_code == 404 and response.json()["error"]["code"] == "NOT_FOUND"
     assert client.get("/api/v1/groups/0").status_code == 422
+
+
+def test_groups_map_returns_fragments_with_a_shared_scores_shape(client):
+    body = client.get("/api/v1/groups?bbox=19.8,49.97,20.2,50.12&dimension=views&min_score=4&rated_only=true").json()
+    props = body["features"][0]["properties"]
+    assert body["features"][0]["geometry"]["type"] == "MultiLineString"
+    assert props["kind"] == "group" and props["scores"]["traffic"] == 2.5 and props["scores_source"] == "own"
+
+
+def test_groups_map_clamps_a_viewport_that_reaches_past_the_area(client):
+    assert client.get("/api/v1/groups?bbox=19.0,49.0,21.0,51.0").status_code == 200   # cut to the area, not rejected
+    assert client.get("/api/v1/groups?bbox=10,40,11,41").json() == {"type": "FeatureCollection", "features": []}
+    assert client.get("/api/v1/groups?bbox=20.2,50.1,19.8,49.97").status_code == 422   # wrong order
+    assert client.get("/api/v1/groups?bbox=19.8,49.97,20.2,50.12&min_score=4").status_code == 422  # needs dimension
+
+
+def test_clamp_bbox_cuts_to_krakow():
+    from app.geo import KRAKOW, clamp_bbox
+    assert clamp_bbox("0,0,90,90") == KRAKOW
+    assert clamp_bbox("19.9,50.0,20.0,50.1") == (19.9, 50.0, 20.0, 50.1)
+    assert clamp_bbox("30,60,31,61") is None

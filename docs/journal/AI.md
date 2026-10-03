@@ -4,6 +4,57 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+## 2026-10-05 — prukasz — gałąź `ai/map-groups`
+
+**Zadanie:** mapa ma ładować większy obszar (oddalona mapa pokazywała tylko część, bo `GET /segments` odrzuca ponad 2000 odcinków: 422).
+
+**Zrobione:**
+- widok `fragment_map` (5 053 fragmenty, uproszczona geometria ok. 3 m, wyniki ważone długością), odświeżany razem ze statystykami
+- `GET /groups?bbox=`: fragmenty dla oddalonej mapy, całe miasto 554 kB po gzip; bbox poza ramką Krakowa jest przycinany (`clamp_bbox`), nie odrzucany
+- kompresja gzip w backendzie (`GZipMiddleware`)
+- frontend: poniżej zoomu 15 mapa ładuje fragmenty, od 15 odcinki; klik na fragmencie przybliża mapę; podświetlenie wybranego odcinka nie myli się z fragmentem o tym samym numerze; cieńsze linie przy oddaleniu
+- testy endpointu i przycinania (36 przechodzi w plikach grupowania); build frontendu przechodzi
+
+**Dalej / blokery:**
+- `GET /segments` nadal odrzuca bbox wychodzący poza ramkę Krakowa (`OUT_OF_AREA`): mapa przy krawędzi miasta może dostać błąd; to samo przycinanie warto dać i tam
+- na zoomie 15 w gęstym centrum odcinków może być > 2000 (wtedy 422)
+- przy każdym przebudowaniu fragmentów lub ocen `fragment_map` trzeba odświeżyć (cron robi to co 2 min przez `refresh_segment_stats()`)
+
+
+## 2026-10-05 — prukasz — gałąź `ai/fragments` (seed stref)
+
+**Zadanie:** dane demo w trzech strefach wokół Rynku: centrum (ruch duży, widoki ładne, mało parkingu, dobra nawierzchnia), donut (ruch średni, brzydko, parking OK, nawierzchnia bardzo dobra), obwarzanek (nawierzchnia średnia i słaba, dużo parkingu, widoki średnie i słabe).
+
+**Zrobione:**
+- `scripts/seed_zones.py` (`--dry-run`, `--apply`, `--remove`): strefy < 1,5 km, 1,5–4 km, > 4 km od Rynku, miękkie granice (±0,35 km), stały "charakter" odcinka plus szum oceniającego, pory dnia (w nocy gorsze widoki i bezpieczeństwo, mniejszy ruch, łatwiejszy parking)
+- migracja `ratings.seed_tag`: dane syntetyczne są oznaczone `zones-2026-10` i da się je usunąć (`--remove`); istniejące oceny nie zostały ruszone (sprawdzane w transakcji)
+- na bazie: 42 691 ocen na 9 542 odcinkach, 2 odcinki ocen na fragment, 3–6 ocen na odcinek; teraz wszystkie 22 664 odcinki mają wynik efektywny
+- średnie ocen: centrum ruch 1,8, parking 1,9, widoki 4,0, nawierzchnia 4,2; donut widoki 1,8, nawierzchnia 4,5; obwarzanek nawierzchnia 2,35, parking 4,5
+
+**Dalej / blokery:**
+- wynik efektywny jest ściągany do średniej typu drogi (cała Polska zgodnie z danymi), więc centrum wychodzi łagodniej niż same oceny (widoki 3,4 zamiast 4,0); do rozważenia lokalny prior zamiast globalnego
+- bezpieczeństwo nie było w zleceniu: ustawione na 3,4 / 3,5 / 2,8 (w skrypcie do zmiany)
+- stare, losowe oceny z poprzedniego seedu (1 995, 400 odcinków) zostały; usunięcie wymaga zgody autora
+
+
+## 2026-10-05 — prukasz — gałąź `ai/fragments`
+
+**Zadanie:** jednostki oceny po 300–500 m zamiast kawałków po kilkadziesiąt metrów; cięcie tylko na ważnych skrzyżowaniach; krótsze łączone z sąsiadem; baza i routing spójne z nowym podziałem.
+
+**Zrobione:**
+- `build_fragments` (`backend/app/grouping.py`): łańcuchy jednej ulicy cięte na skrzyżowaniach z drogami primary/secondary/tertiary po min. 300 m (limit 700 m), fragmenty krótsze niż 300 m łączone z sąsiadem (najpierw ta sama ulica, potem dowolny; limit 900 m); sąsiedztwo także dla skrzyżowań T znalezionych w geometrii
+- wynik na bazie: 22 664 odcinki → **5 053 fragmenty** (było 10 303), mediana 534 m, 3,8% długości dróg w fragmentach < 300 m (izolowane drogi)
+- zastosowane w jednej transakcji (`scripts/build_segment_groups.py --apply`), odświeżone `segment_scores` (2 289 odcinków z wynikiem, było 1 468) i `routing_graph`
+- widok `routing_edge_group` (krawędź grafu → fragment); trasa 14,5 km = 33 fragmenty zamiast 194 krawędzi
+- celowo **nie** skracałem grafu routingu: węzły na małych skrzyżowaniach są potrzebne do skrętu; routing 0,2–0,7 s, więc nie ma potrzeby go odchudzać
+- 11 testów fragmentów (cięcie, scalanie, limity, determinizm); testów backendu/UI nie uruchamiałem na prośbę
+
+**Dalej / blokery:**
+- ok. 2/3 krawędzi grafu nie ma odcinka, więc nie ma fragmentu (drogi serwisowe itp.); oceny dla nich to priory z tagów OSM
+- fragment łączy czasem różne ulice (np. krótka uliczka z sąsiednią): `from_street`/`to_street` są wtedy puste
+- jedna ocena rozchodzi się teraz na ok. 500 m: do oceny po stronie UI, czy "tylko ten kawałek" jest potrzebne
+
+
 ## 2026-10-04 — prukasz — gałąź `ai/llm-openrouter`
 
 **Zadanie:** pierwsze prawdziwe wywołanie LLM w serwisie AI (dotąd tylko mock).

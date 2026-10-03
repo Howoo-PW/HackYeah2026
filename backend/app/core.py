@@ -9,9 +9,9 @@ from fastapi import APIRouter, Depends, Path, Query, Request, Response
 from .auth import User, optional_user, require_admin, require_user
 from .database import get_repository
 from .errors import AppError
-from .geo import parse_bbox, validate_point
+from .geo import clamp_bbox, parse_bbox, validate_point
 from .schemas import (Comment, CommentCreate, CommentPage, ContentUpdate, Dimension,
-                      FeatureCollection, GroupDetail, NearestSegment, Profile, Rating, RatingCreate, SegmentDetail)
+                      FeatureCollection, GroupDetail, GroupMapCollection, NearestSegment, Profile, Rating, RatingCreate, SegmentDetail)
 
 router = APIRouter()
 RepositoryDep = Annotated[object, Depends(get_repository, scope="function")]
@@ -39,6 +39,18 @@ def nearest(repo: RepositoryDep, lat: float, lon: float):
     """Find the closest road no more than 50 metres from a Krakow location."""
     validate_point(lat, lon)
     return repo.nearest(lat, lon)
+
+
+@router.get("/groups", response_model=GroupMapCollection, tags=["segments"])
+def groups_map(repo: RepositoryDep, bbox: str, dimension: Dimension | None = None,
+               min_score: Annotated[float | None, Query(ge=1, le=5)] = None, rated_only: bool = False):
+    """Fragments (300-700 m) with merged geometry and scores for zoomed-out map views."""
+    if min_score is not None and dimension is None:
+        raise AppError(422, "VALIDATION_ERROR", "min_score wymaga dimension")
+    area = clamp_bbox(bbox)
+    if area is None:
+        return {"type": "FeatureCollection", "features": []}
+    return repo.group_map(area, dimension, min_score, rated_only)
 
 
 @router.get("/groups/{group_id}", response_model=GroupDetail, tags=["segments"])
