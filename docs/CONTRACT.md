@@ -121,7 +121,7 @@ type SegmentProperties = {
   active_obstacles_count: number;
 };
 
-type GroupRef = {             // grupa = kolejne kawałki jednej ulicy, ok. 500 m
+type GroupRef = {             // grupa (fragment) = 300–700 m drogi; krótsze kawałki łączone z sąsiadem
   id: number;
   name: string | null;
   highway: string;
@@ -282,7 +282,9 @@ Limit: max 2000 odcinków na odpowiedź. Przy większym obszarze → `422 VALIDA
 
 **Grupy i wynik efektywny.** OSM tnie drogi na każdym skrzyżowaniu, więc połowa odcinków ma
 poniżej 100 m i nikt ich nie oceni. Odcinki (`id`) i oceny zostają bez zmian. Dodatkowo kolejne
-kawałki jednej ulicy (ta sama nazwa i typ drogi) tworzą **grupę** po ok. 500 m. Wynik `scores`
+kawałki jednej ulicy (ta sama nazwa i typ drogi) tworzą **grupę** (fragment) po 300–700 m: ulica jest cięta tylko na
+skrzyżowaniach z ważnymi drogami (primary, secondary, tertiary), a fragment krótszy niż 300 m jest łączony z sąsiednim.
+Wynik `scores`
 odcinka liczy się tak: własne oceny odcinka (ważą tyle, co 2 oceny grupy), w przeciwnym razie
 średnia pozostałych odcinków grupy, ściągana do średniej typu drogi, gdy ocen jest mało.
 `scores_source` mówi, skąd wynik: `own`, `group` (szacunek, pokaż jaśniej) lub `none`.

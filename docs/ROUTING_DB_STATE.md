@@ -10,7 +10,8 @@ Dla `foot-walking` `POST /route` zostaje przy ORS (jest w `backend/routing`), ko
 |---|---|
 | `pgrouting` 3.4.1 | zainstalowany w schemacie `extensions` |
 | **`osm_ways`** | **sieć dróg dla auta i roweru z OSM**: 58 370 dróg, kierunki per profil, prędkości, węzły OSM, surowe tagi (patrz niżej) |
-| `segment_groups`, `segments.group_id` | 10 303 grup po ok. 500 m (kolejne kawałki jednej ulicy), każdy odcinek ma grupę |
+| `segment_groups`, `segments.group_id` | **5 053 fragmenty** (mediana 534 m, 300–900 m), każdy odcinek ma fragment; ulica cięta tylko na skrzyżowaniach z ważnymi drogami, krótsze kawałki scalane z sąsiadem |
+| `routing_edge_group` (widok) | krawędź grafu → fragment (przez `segment_id` krawędzi); krawędzie bez odcinka (ok. 2/3, np. drogi serwisowe) nie mają fragmentu |
 | `segment_scores` (widok materializowany) | **wynik efektywny** odcinka w SQL: 5 wymiarów, `ratings_count`, `source` (`own`/`group`), `confidence`. Tylko odcinki z wynikiem (1 468 z 22 664). Odświeżany co 2 min |
 | `effective_score(...)` | ta sama reguła co `backend/app/grouping.py` (zgodność sprawdzona na wszystkich odcinkach) |
 
@@ -72,7 +73,9 @@ skierowanym grafem, więc po zbudowaniu krawędzi trzeba sprawdzić też silną 
 
 - Odświeżenie danych OSM: `python scripts/load_osm_routing.py` (kasuje cache: usuń `data/osm_cache/`). Tabela jest
   zastępowana w jednej transakcji. Po odświeżeniu przebuduj graf.
-- Po ponownym imporcie OSM do `segments` id odcinków się przesuwają: przebuduj grupy
+- **Graf routingu zostaje drobny** (92 tys. krawędzi, mediana 34 m): łączenie krawędzi przez małe skrzyżowania odcięłoby
+  uliczki odchodzące w połowie krawędzi. Jednostką oceny jest fragment, nie krawędź. Trasa 14,5 km to ok. 33 fragmenty.
+- Po ponownym imporcie OSM do `segments` id odcinków się przesuwają: przebuduj fragmenty (`--apply`)
   (`scripts/build_segment_groups.py`) i `refresh materialized view public.segment_scores`.
 - `refresh_segment_stats()` odświeża także `segment_scores` (nadal tylko `service_role`).
 - `osm_ways` jest niedostępna przez publiczne API (RLS bez polityk): backend i B2 używają roli `postgres`.

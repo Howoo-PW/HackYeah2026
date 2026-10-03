@@ -4,6 +4,24 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+## 2026-10-05 — prukasz — gałąź `ai/fragments`
+
+**Zadanie:** jednostki oceny po 300–500 m zamiast kawałków po kilkadziesiąt metrów; cięcie tylko na ważnych skrzyżowaniach; krótsze łączone z sąsiadem; baza i routing spójne z nowym podziałem.
+
+**Zrobione:**
+- `build_fragments` (`backend/app/grouping.py`): łańcuchy jednej ulicy cięte na skrzyżowaniach z drogami primary/secondary/tertiary po min. 300 m (limit 700 m), fragmenty krótsze niż 300 m łączone z sąsiadem (najpierw ta sama ulica, potem dowolny; limit 900 m); sąsiedztwo także dla skrzyżowań T znalezionych w geometrii
+- wynik na bazie: 22 664 odcinki → **5 053 fragmenty** (było 10 303), mediana 534 m, 3,8% długości dróg w fragmentach < 300 m (izolowane drogi)
+- zastosowane w jednej transakcji (`scripts/build_segment_groups.py --apply`), odświeżone `segment_scores` (2 289 odcinków z wynikiem, było 1 468) i `routing_graph`
+- widok `routing_edge_group` (krawędź grafu → fragment); trasa 14,5 km = 33 fragmenty zamiast 194 krawędzi
+- celowo **nie** skracałem grafu routingu: węzły na małych skrzyżowaniach są potrzebne do skrętu; routing 0,2–0,7 s, więc nie ma potrzeby go odchudzać
+- 11 testów fragmentów (cięcie, scalanie, limity, determinizm); testów backendu/UI nie uruchamiałem na prośbę
+
+**Dalej / blokery:**
+- ok. 2/3 krawędzi grafu nie ma odcinka, więc nie ma fragmentu (drogi serwisowe itp.); oceny dla nich to priory z tagów OSM
+- fragment łączy czasem różne ulice (np. krótka uliczka z sąsiednią): `from_street`/`to_street` są wtedy puste
+- jedna ocena rozchodzi się teraz na ok. 500 m: do oceny po stronie UI, czy "tylko ten kawałek" jest potrzebne
+
+
 ## 2026-10-04 — prukasz — gałąź `ai/llm-openrouter`
 
 **Zadanie:** pierwsze prawdziwe wywołanie LLM w serwisie AI (dotąd tylko mock).
