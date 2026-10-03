@@ -4,6 +4,22 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+## 2026-10-05 — prukasz — gałąź `ai/fragments` (seed stref)
+
+**Zadanie:** dane demo w trzech strefach wokół Rynku: centrum (ruch duży, widoki ładne, mało parkingu, dobra nawierzchnia), donut (ruch średni, brzydko, parking OK, nawierzchnia bardzo dobra), obwarzanek (nawierzchnia średnia i słaba, dużo parkingu, widoki średnie i słabe).
+
+**Zrobione:**
+- `scripts/seed_zones.py` (`--dry-run`, `--apply`, `--remove`): strefy < 1,5 km, 1,5–4 km, > 4 km od Rynku, miękkie granice (±0,35 km), stały "charakter" odcinka plus szum oceniającego, pory dnia (w nocy gorsze widoki i bezpieczeństwo, mniejszy ruch, łatwiejszy parking)
+- migracja `ratings.seed_tag`: dane syntetyczne są oznaczone `zones-2026-10` i da się je usunąć (`--remove`); istniejące oceny nie zostały ruszone (sprawdzane w transakcji)
+- na bazie: 42 691 ocen na 9 542 odcinkach, 2 odcinki ocen na fragment, 3–6 ocen na odcinek; teraz wszystkie 22 664 odcinki mają wynik efektywny
+- średnie ocen: centrum ruch 1,8, parking 1,9, widoki 4,0, nawierzchnia 4,2; donut widoki 1,8, nawierzchnia 4,5; obwarzanek nawierzchnia 2,35, parking 4,5
+
+**Dalej / blokery:**
+- wynik efektywny jest ściągany do średniej typu drogi (cała Polska zgodnie z danymi), więc centrum wychodzi łagodniej niż same oceny (widoki 3,4 zamiast 4,0); do rozważenia lokalny prior zamiast globalnego
+- bezpieczeństwo nie było w zleceniu: ustawione na 3,4 / 3,5 / 2,8 (w skrypcie do zmiany)
+- stare, losowe oceny z poprzedniego seedu (1 995, 400 odcinków) zostały; usunięcie wymaga zgody autora
+
+
 ## 2026-10-05 — prukasz — gałąź `ai/fragments`
 
 **Zadanie:** jednostki oceny po 300–500 m zamiast kawałków po kilkadziesiąt metrów; cięcie tylko na ważnych skrzyżowaniach; krótsze łączone z sąsiadem; baza i routing spójne z nowym podziałem.
