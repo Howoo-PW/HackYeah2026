@@ -135,7 +135,7 @@ case when st_distance(st_centroid(s.geom)::geography, st_setsrid(st_makepoint(%(
 
 
 def refresh(conn):
-    for view in ("segment_stats", "segment_stats_by_time", "segment_scores", "routing_graph"):
+    for view in ("segment_stats", "segment_stats_by_time", "segment_scores", "fragment_map", "routing_graph"):
         if conn.execute("select to_regclass(%s)", (f"public.{view}",)).fetchone()[0]:
             conn.execute(f"refresh materialized view public.{view}")  # noqa: S608 (fixed names)
 

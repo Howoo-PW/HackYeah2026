@@ -4,6 +4,23 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+## 2026-10-05 — prukasz — gałąź `ai/map-groups`
+
+**Zadanie:** mapa ma ładować większy obszar (oddalona mapa pokazywała tylko część, bo `GET /segments` odrzuca ponad 2000 odcinków: 422).
+
+**Zrobione:**
+- widok `fragment_map` (5 053 fragmenty, uproszczona geometria ok. 3 m, wyniki ważone długością), odświeżany razem ze statystykami
+- `GET /groups?bbox=`: fragmenty dla oddalonej mapy, całe miasto 554 kB po gzip; bbox poza ramką Krakowa jest przycinany (`clamp_bbox`), nie odrzucany
+- kompresja gzip w backendzie (`GZipMiddleware`)
+- frontend: poniżej zoomu 15 mapa ładuje fragmenty, od 15 odcinki; klik na fragmencie przybliża mapę; podświetlenie wybranego odcinka nie myli się z fragmentem o tym samym numerze; cieńsze linie przy oddaleniu
+- testy endpointu i przycinania (36 przechodzi w plikach grupowania); build frontendu przechodzi
+
+**Dalej / blokery:**
+- `GET /segments` nadal odrzuca bbox wychodzący poza ramkę Krakowa (`OUT_OF_AREA`): mapa przy krawędzi miasta może dostać błąd; to samo przycinanie warto dać i tam
+- na zoomie 15 w gęstym centrum odcinków może być > 2000 (wtedy 422)
+- przy każdym przebudowaniu fragmentów lub ocen `fragment_map` trzeba odświeżyć (cron robi to co 2 min przez `refresh_segment_stats()`)
+
+
 ## 2026-10-05 — prukasz — gałąź `ai/fragments` (seed stref)
 
 **Zadanie:** dane demo w trzech strefach wokół Rynku: centrum (ruch duży, widoki ładne, mało parkingu, dobra nawierzchnia), donut (ruch średni, brzydko, parking OK, nawierzchnia bardzo dobra), obwarzanek (nawierzchnia średnia i słaba, dużo parkingu, widoki średnie i słabe).

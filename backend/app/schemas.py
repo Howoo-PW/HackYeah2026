@@ -140,6 +140,31 @@ class GroupDetail(GroupRef):
     segment_ids: list[int]
 
 
+class GroupMapProperties(BaseModel):
+    """One fragment for a zoomed-out map; `scores` has the same shape as on a segment so the layer is shared."""
+
+    id: int
+    kind: Literal["group"] = "group"
+    name: str | None
+    highway: str
+    length_m: float
+    segments_count: int
+    ratings_count: int
+    scores: Scores
+    scores_source: Literal["own", "group", "none"]
+
+
+class GroupMapFeature(BaseModel):
+    type: Literal["Feature"] = "Feature"
+    geometry: MultiLineString
+    properties: GroupMapProperties
+
+
+class GroupMapCollection(BaseModel):
+    type: Literal["FeatureCollection"] = "FeatureCollection"
+    features: list[GroupMapFeature]
+
+
 class SegmentProperties(BaseModel):
     id: int
     osm_way_id: int

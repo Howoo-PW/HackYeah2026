@@ -6,8 +6,8 @@ import type { LineLayerSpecification } from 'react-map-gl/maplibre'
 import { setWorkerUrl } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { fetchSegments } from '../api/client'
-import type { Bbox, LatLon, Place, SegmentCollection } from '../api/types'
+import { fetchGroupMap, fetchSegments } from '../api/client'
+import type { Bbox, LatLon, MapCollection, Place } from '../api/types'
 import { KRAKOW_BBOX, KRAKOW_CENTER, NO_DATA_COLOR, SCORE_COLORS, metricScore } from '../lib/dimensions'
 import type { Metric } from '../lib/dimensions'
 import type { PointKey } from '../routing/useRouteDraft'
@@ -61,8 +61,11 @@ function applyBasemap(mapRef: MapRef, basemap: Basemap, original: Record<string,
     }
   }
 }
-/** Below this zoom the viewport is too big for the 2000 segments/response limit (contract 5.2). */
-const MIN_FETCH_ZOOM = 13
+/**
+ * From this zoom up the map loads segments (limit 2000 per response, contract 5.2). Below it the viewport is too big
+ * for that, so it loads fragments (GET /groups): the whole city is about 5 000, so any zoom works.
+ */
+const SEGMENT_ZOOM = 15
 
 /** A planned route to draw; the selected alternative is emphasised and the map fits to it. */
 export type DrawnRoute = { coordinates: [number, number][]; selected: boolean }
@@ -105,14 +108,14 @@ const lineColor: LineLayerSpecification['paint'] = {
       5, SCORE_COLORS[4],
     ],
   ],
-  'line-width': ['interpolate', ['linear'], ['zoom'], 13, 3, 17, 8],
+  'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.6, 13, 3, 17, 8],
   'line-opacity': ['case', ['==', ['get', 'score'], null], 0.55, 0.95],
 }
 
 /** On imagery the rating colors need to be bolder: full opacity (grey for unrated), thicker line. */
 const satelliteLineColor: LineLayerSpecification['paint'] = {
   ...lineColor,
-  'line-width': ['interpolate', ['linear'], ['zoom'], 13, 4, 17, 10],
+  'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 13, 4, 17, 10],
   'line-opacity': ['case', ['==', ['get', 'score'], null], 0.85, 1],
 }
 
@@ -129,7 +132,7 @@ export default function MapView({ routes, basemap, dimension, filter, selectedId
   const mapRef = useRef<MapRef>(null)
   const [bbox, setBbox] = useState<Bbox | null>(null)
   const [zoom, setZoom] = useState(13)
-  const [data, setData] = useState<SegmentCollection | null>(null)
+  const [data, setData] = useState<MapCollection | null>(null)
   const [styleInfo, setStyleInfo] = useState<StyleInfo | null>(null)
   const originalVisibility = useRef<Record<string, string>>({})
 
@@ -144,14 +147,14 @@ export default function MapView({ routes, basemap, dimension, filter, selectedId
   // Refetch on viewport/filter change; abort the previous request so stale responses never win.
   useEffect(() => {
     if (!bbox) return
-    if (zoom < MIN_FETCH_ZOOM) {
-      onStatus({ mock: false, error: null, zoomedOut: true, loading: false })
-      return
-    }
     const ctrl = new AbortController()
     onStatus({ mock: false, error: null, zoomedOut: false, loading: true })
     const timer = setTimeout(() => {
-      fetchSegments(bbox, filter, ctrl.signal)
+      const request: Promise<{ data: MapCollection; mock: boolean }> =
+        zoom < SEGMENT_ZOOM
+          ? fetchGroupMap(bbox, filter, ctrl.signal).then((data) => ({ data, mock: false }))
+          : fetchSegments(bbox, filter, ctrl.signal)
+      request
         .then(({ data, mock }) => {
           setData(data)
           onStatus({ mock, error: null, zoomedOut: false, loading: false })
@@ -239,7 +242,12 @@ export default function MapView({ routes, basemap, dimension, filter, selectedId
       onRouteClick({ lat: e.lngLat.lat, lon: e.lngLat.lng })
       return
     }
-    const id = e.features?.[0]?.properties?.id
+    const feature = e.features?.[0]
+    if (feature?.properties?.kind === 'group') {
+      mapRef.current?.flyTo({ center: [e.lngLat.lng, e.lngLat.lat], zoom: SEGMENT_ZOOM + 1, duration: 600 })
+      return
+    }
+    const id = feature?.properties?.id
     onSelect(typeof id === 'number' ? id : null)
   }
 
@@ -312,7 +320,7 @@ export default function MapView({ routes, basemap, dimension, filter, selectedId
             id="segment-selected"
             type="line"
             beforeId={styleInfo.labelId}
-            filter={['in', ['get', 'id'], ['literal', selectedIds]]}
+            filter={['all', ['!=', ['get', 'kind'], 'group'], ['in', ['get', 'id'], ['literal', selectedIds]]]}
             layout={{ 'line-cap': 'round' }}
             paint={{ 'line-color': '#111827', 'line-width': ['interpolate', ['linear'], ['zoom'], 13, 9, 17, 18], 'line-opacity': 0.5 }}
           />

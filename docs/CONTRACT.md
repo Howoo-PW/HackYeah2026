@@ -290,6 +290,17 @@ odcinka liczy się tak: własne oceny odcinka (ważą tyle, co 2 oceny grupy), w
 `scores_source` mówi, skąd wynik: `own`, `group` (szacunek, pokaż jaśniej) lub `none`.
 `rated_only` i `min_score` działają na wyniku efektywnym i filtrują po limicie 2000 odcinków.
 
+#### `GET /groups?bbox=` — P
+
+Fragmenty do widoku oddalonej mapy (cały Kraków to ok. 5 000, odpowiedź ok. 550 kB po gzip). Parametry jak w `GET /segments`
+(`bbox`, `dimension`, `min_score`, `rated_only`), ale `bbox` wychodzący poza Kraków jest **przycinany** do obszaru (poza
+obszarem: pusta lista), a nie odrzucany. Limit 6000; ponad → `422 VALIDATION_ERROR`.
+Odpowiedź: `FeatureCollection` z geometrią `MultiLineString` (uproszczoną, ok. 3 m) i `properties`:
+`id` (id fragmentu), `kind: "group"`, `name`, `highway`, `length_m`, `segments_count`, `ratings_count`,
+`scores` (średnia z wyników efektywnych odcinków, ważona długością), `scores_source`. `id` to id **fragmentu**,
+nie odcinka: klik na takiej linii powinien przybliżać mapę, a nie wołać `GET /segments/{id}`.
+Frontend: powyżej zoomu 15 odcinki (`GET /segments`), poniżej fragmenty.
+
 #### `GET /groups/{id}` — P
 
 Odpowiedź: `GroupDetail`: scalona geometria do podświetlenia na mapie, id odcinków i średnie

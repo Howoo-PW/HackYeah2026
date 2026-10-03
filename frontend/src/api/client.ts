@@ -1,6 +1,6 @@
 import { metricScore, type Metric } from '../lib/dimensions'
 import { mockComments, mockCreatedComment, mockCreatedRating, mockSegmentDetail, mockSegments } from './mocks'
-import type { ApiError, Bbox, GroupDetail, NearestSegment, Opinion, Paginated, Rating, RatingInput, RouteRequest, RouteResult, SegmentCollection, SegmentDetail, StreetHit } from './types'
+import type { ApiError, Bbox, GroupDetail, NearestSegment, Opinion, Paginated, Rating, RatingInput, RouteRequest, RouteResult, GroupMapCollection, SegmentCollection, SegmentDetail, StreetHit } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api/v1'
 /** Force mock data even when the backend is up (set VITE_USE_MOCKS=true). */
@@ -64,6 +64,20 @@ export async function fetchSegments(bbox: Bbox, filter: SegmentFilter, signal?: 
     }
   }
   return { data: applyMockFilter(mockSegments(bbox), filter), mock: true }
+}
+
+/**
+ * GET /groups?bbox= : fragments for zoomed-out views (the whole city is about 5 000 features). Unlike
+ * {@link fetchSegments} there is no mock fallback; errors are rethrown for the UI.
+ */
+export async function fetchGroupMap(bbox: Bbox, filter: SegmentFilter, signal?: AbortSignal): Promise<GroupMapCollection> {
+  const params = new URLSearchParams({ bbox: bbox.map((n) => n.toFixed(5)).join(',') })
+  if (filter.dimension && filter.dimension !== 'overall' && filter.minScore !== null) {
+    params.set('dimension', filter.dimension)
+    params.set('min_score', String(filter.minScore))
+  }
+  if (filter.ratedOnly) params.set('rated_only', 'true')
+  return request<GroupMapCollection>(`/groups?${params}`, signal)
 }
 
 /** GET /segments/{id}. Same mock fallback as {@link fetchSegments}. */

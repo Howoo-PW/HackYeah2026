@@ -134,9 +134,9 @@ def apply(url: str, groups, n_segments: int) -> None:
                              "(select count(*) from public.segments s where s.group_id = g.id)").fetchone()[0]
         print(f"in transaction: segments {total}, grouped {grouped}, fragments {n_groups}, empty {empty}, wrong counts {wrong}")
         assert total == grouped == n_segments and n_groups == len(groups) and empty == 0 and wrong == 0, "inconsistent, rolling back"
-        conn.execute("refresh materialized view public.segment_scores")
-        if conn.execute("select to_regclass('public.routing_graph')").fetchone()[0]:
-            conn.execute("refresh materialized view public.routing_graph")
+        for view in ("segment_scores", "fragment_map", "routing_graph"):  # in dependency order
+            if conn.execute("select to_regclass(%s)", (f"public.{view}",)).fetchone()[0]:
+                conn.execute(f"refresh materialized view public.{view}")  # noqa: S608 (fixed names)
         scored = conn.execute("select count(*) from public.segment_scores").fetchone()[0]
         conn.commit()
         print(f"committed; segment_scores rows: {scored}")
