@@ -16,8 +16,33 @@ export type SegmentProperties = {
   highway: string
   length_m: number
   scores: Scores
+  /** Where `scores` come from: own ratings, estimated from the neighbouring segments of the group, or nothing. */
+  scores_source?: 'own' | 'group' | 'none'
+  /** The street stretch (about 500 m) this piece belongs to; users see and rate it as one unit (contract 4). */
+  group?: GroupRef | null
   ratings_count: number
   active_obstacles_count: number
+}
+
+/** A run of consecutive pieces of one street, about 500 m (contract 4, "Grupy"). */
+export type GroupRef = {
+  id: number
+  name: string | null
+  highway: string
+  length_m: number
+  segments_count: number
+  /** Most important other street at the start / end of the stretch. */
+  from_street: string | null
+  to_street: string | null
+  /** Ratings of all segments in the group. */
+  ratings_count: number
+}
+
+/** GET /groups/{id}: merged geometry for highlighting, member segment ids and the group's average scores. */
+export type GroupDetail = GroupRef & {
+  scores: Scores
+  geometry: { type: 'MultiLineString'; coordinates: number[][][] }
+  segment_ids: number[]
 }
 
 export type Rating = {
@@ -104,3 +129,58 @@ export type SegmentCollection = FeatureCollection<LineString, SegmentProperties>
 export type Bbox = [number, number, number, number]
 
 export type ApiError = { error: { code: string; message: string; details?: Record<string, unknown> } }
+
+/** Point as an object (contract section 2): note `lat` first here, unlike GeoJSON `[lon, lat]`. */
+export type LatLon = { lat: number; lon: number }
+
+export type RouteProfile = 'driving-car' | 'cycling-regular' | 'foot-walking'
+
+/** How much each dimension matters for the route: 0 = not at all … 3 = very much (contract 5.8). */
+export type RouteWeights = Record<Dimension, 0 | 1 | 2 | 3>
+
+/** Body of POST /route (contract 5.8). `via`: up to 5 intermediate stops in travel order. */
+export type RouteRequest = { from: LatLon; to: LatLon; via?: LatLon[]; profile: RouteProfile; weights: RouteWeights }
+
+/**
+ * A named place: a search result, a street picked on the map or the user's location.
+ * `bounds` is [west, south, east, north] when the place is an area/street (used to fit the map), else null.
+ */
+export type Place = {
+  lat: number
+  lon: number
+  name: string
+  detail: string | null
+  bounds: [number, number, number, number] | null
+  /** Street or other place; only used to pick an icon in search results. */
+  kind?: 'street' | 'place'
+  /** Set for streets from our own database: the segment to open in the ratings panel. */
+  segmentId?: number
+}
+
+/** GET /segments/nearest (contract 5.2): the closest segment within 50 m. */
+export type NearestSegment = SegmentProperties & { distance_m: number }
+
+/** One item of GET /search (contract 5.10): a street from our own segments. */
+export type StreetHit = {
+  name: string
+  highway: string
+  segments_count: number
+  length_m: number
+  location: LatLon
+  /** minLon,minLat,maxLon,maxLat */
+  bbox: Bbox
+  segment_id: number
+}
+
+/** One route from POST /route (contract 5.8). `score` is null when no rated segment lies on the route. */
+export type RouteResult = {
+  rank: number
+  geometry: { type: 'LineString'; coordinates: [number, number][] }
+  distance_m: number
+  duration_s: number
+  score: number | null
+  scores: Scores
+  /** Share (0-1) of the route length that lies on rated segments. */
+  coverage: number
+  segment_ids: number[]
+}

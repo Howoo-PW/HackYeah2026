@@ -48,3 +48,9 @@ export function overallScore(scores: Scores): number | null {
 export function metricScore(scores: Scores, metric: Metric): number | null {
   return metric === 'overall' ? overallScore(scores) : scores[metric]
 }
+
+/** Same area check the backend does (422 OUT_OF_AREA otherwise). */
+export function inKrakow(lat: number, lon: number): boolean {
+  const [minLon, minLat, maxLon, maxLat] = KRAKOW_BBOX
+  return lon >= minLon && lon <= maxLon && lat >= minLat && lat <= maxLat
+}

@@ -1,21 +1,28 @@
 import { useEffect, useState } from 'react'
-import { fetchComments, fetchSegmentDetail } from '../api/client'
-import type { Opinion, Rating, Scores, SegmentDetail, Summary } from '../api/types'
+import { fetchComments, fetchGroup, fetchSegmentDetail } from '../api/client'
+import type { GroupDetail, Opinion, Rating, Scores, SegmentDetail, Summary } from '../api/types'
 import { useAuth } from '../auth/useAuth'
 import { DIMENSIONS, overallScore, scoreColor } from '../lib/dimensions'
 import CommentForm from './CommentForm'
 import OpinionCard, { Stars } from './OpinionCard'
 import RatingForm from './RatingForm'
 
-type Props = { segmentId: number; onClose: () => void }
+type Props = {
+  segmentId: number
+  /** Called with the ids of the whole street stretch once it is known, so the map can highlight it. */
+  onGroup: (segmentIds: number[]) => void
+  onClose: () => void
+}
 
 /**
  * Remount with `key={segmentId}` so state resets per segment.
  * Bottom sheet on mobile, side card on desktop: overall score, per-dimension scores, OSM info,
- * AI summary and opinions for one segment.
+ * AI summary and opinions. The unit shown is the street stretch (group, about 500 m) the clicked piece
+ * belongs to, since OSM cuts roads at every junction; falls back to the single segment without a group.
  */
-export default function SegmentPanel({ segmentId, onClose }: Props) {
+export default function SegmentPanel({ segmentId, onGroup, onClose }: Props) {
   const [detail, setDetail] = useState<SegmentDetail | null>(null)
+  const [group, setGroup] = useState<GroupDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [width, setWidth] = useStoredWidth()
   const { user } = useAuth()
@@ -35,21 +42,41 @@ export default function SegmentPanel({ segmentId, onClose }: Props) {
     return () => ctrl.abort()
   }, [segmentId, userId, reload])
 
+  const groupId = detail?.group?.id
+  useEffect(() => {
+    if (groupId === undefined) return
+    const ctrl = new AbortController()
+    fetchGroup(groupId, ctrl.signal).then((g) => {
+      if (!g) return
+      setGroup(g)
+      onGroup(g.segment_ids)
+    })
+    return () => ctrl.abort()
+  }, [groupId, reload, onGroup])
+
+  // What the panel describes: the whole stretch when known, else the clicked segment.
+  const title = group?.name ?? detail?.name ?? null
+  const length = group?.length_m ?? detail?.length_m ?? 0
+  const scores = group?.scores ?? detail?.scores
+  const ratingsCount = group?.ratings_count ?? detail?.ratings_count ?? 0
+  const between = [group?.from_street && `od ${group.from_street}`, group?.to_street && `do ${group.to_street}`].filter(Boolean).join(' ')
+
   return (
     <div
       className="pointer-events-auto relative w-full md:w-[var(--panel-w)]"
       style={{ '--panel-w': `${width}px` } as React.CSSProperties}
     >
       <ResizeHandle width={width} onChange={setWidth} />
-      <aside className="max-h-[55vh] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl md:max-h-[calc(100dvh-1.5rem)] md:rounded-2xl">
+      <aside className="max-h-[55vh] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl md:max-h-[calc(100dvh-4.5rem)] md:rounded-2xl">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold leading-tight">{detail?.name ?? (error ? 'Błąd' : 'Ładowanie…')}</h2>
+          <h2 className="text-lg font-bold leading-tight">{title ?? (detail ? 'Droga bez nazwy' : error ? 'Błąd' : 'Ładowanie…')}</h2>
           {detail && (
             <p className="text-sm text-gray-500">
-              {detail.highway} · {Math.round(detail.length_m)} m
+              {detail.highway} · {Math.round(length)} m
             </p>
           )}
+          {between && <p className="text-sm text-gray-600">{between}</p>}
         </div>
         <button onClick={onClose} aria-label="Zamknij panel" className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100">
           ✕
@@ -58,13 +85,13 @@ export default function SegmentPanel({ segmentId, onClose }: Props) {
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
-      {detail && (
+      {detail && scores && (
         <>
-          <OverallScore scores={detail.scores} ratingsCount={detail.ratings_count} />
+          <OverallScore scores={scores} ratingsCount={ratingsCount} />
 
           <ul className="mt-4 space-y-2.5">
             {DIMENSIONS.map((d) => {
-              const v = detail.scores[d.id]
+              const v = scores[d.id]
               return (
                 <li key={d.id}>
                   <div className="flex justify-between text-sm">
@@ -188,12 +215,13 @@ function ResizeHandle({ width, onChange }: { width: number; onChange: (w: number
 /** Headline number with stars, like the rating header on Google Maps. */
 function OverallScore({ scores, ratingsCount }: { scores: Scores; ratingsCount: number }) {
   const avg = overallScore(scores)
+  const caption = ratingsCount > 0 ? `${ratingsCount} ocen` : avg !== null ? 'Szacunek na podstawie podobnych dróg' : 'Brak ocen'
   return (
     <div className="mt-4 flex items-center gap-4 rounded-xl bg-gray-50 p-3">
       <span className="text-4xl font-bold leading-none">{avg === null ? '–' : avg.toFixed(1)}</span>
       <div>
         <Stars value={avg} />
-        <p className="mt-0.5 text-xs text-gray-500">{ratingsCount > 0 ? `${ratingsCount} ocen` : 'Brak ocen'}</p>
+        <p className="mt-0.5 text-xs text-gray-500">{caption}</p>
       </div>
     </div>
   )

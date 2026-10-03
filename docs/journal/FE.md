@@ -4,6 +4,27 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+## 2026-10-04 — Beata — gałąź `frontend/routing`
+
+**Zadanie:** sprawdzić uruchomienie w Dockerze; widok wyboru trasy A→B z opcjami (sam wybór, bez routera i bez przekazywania danych).
+
+**Zrobione:**
+- Docker: redis, ai i frontend startują; frontend na http://localhost:5173 zwraca 200 i poprawnie rozwiązuje zależności. Backend jest `unhealthy` (`database: not_configured`, brak `SUPABASE_DB_URL` w `.env`), a Compose nie startuje frontendu, dopóki backend nie jest zdrowy. Sam frontend: `docker compose up -d --build --no-deps frontend`.
+- Układ jak w Google Maps: wyszukiwarka ulic/adresów z podpowiedziami podczas pisania (Photon, opóźnienie 250 ms, strzałki + Enter; zapas po Enterze: Nominatim z limitem 1 zapytanie/s; tylko Kraków) -> karta miejsca z „Trasa” i „Oceny” -> panel trasy. Filtry w zwijanej karcie, legenda na dole, konto w prawym górnym rogu.
+- Panel trasy: pola A i B z wyszukiwarką ulic, „Wskaż na mapie” i „Moja lokalizacja”; punkt z mapy dostaje nazwę ulicy z `GET /segments/nearest` zamiast współrzędnych; przystanki pośrednie (do 3, numerowane pinezki; `via` poza kontraktem), profil, wymagania: 5 wymiarów, każdy z grubym suwakiem na trzy kroki Nieważne/Ważne/Bardzo ważne (waga 0/2/3); „Wyznacz trasę” woła `POST /route` (ORS przez backend): lista propozycji z czasem, dystansem, oceną i pokryciem ocen, wybrana trasa niebieska na mapie, pozostałe szare; przystanki idą jako `via` (kontrakt 5.8); rank 1 = najlepsza dla wymagań (z kosztem czasu względem najszybszej), rank 2 = najszybsza; błędy punktów (404 z `details.field`) opisane po polsku (`routing/planRoute.ts`); wyniki znikają po zmianie punktów, profilu lub wymagań; podgląd zapytania zostaje.
+- Mapa: kolorowe odcinki wstawione pod warstwy etykiet (nazwy ulic nie są zasłonięte), etykiety ciemne z białym obrysem, nazwy ulic pogrubione (font Noto Sans Bold; Medium nie istnieje w OpenFreeMap). Widok satelitarny: przełącznik „Mapa / Satelita”, kafelki Esri World Imagery (warunki użycia do sprawdzenia przed demo, nie cache'ować offline w PWA), w satelicie zostają tylko białe etykiety i odcinki z białym obrysem.
+- Grupy odcinków (kontrakt 4): kliknięcie kawałka ulicy zaznacza na mapie całą grupę (ok. 500 m, `GET /groups/{id}`), a panel opisuje całą grupę (nazwa, długość, „od … do …”, średnie grupy, oceny grupy); „Szacunek na podstawie podobnych dróg” przy braku ocen. Bez grupy (mocki, backend niedostępny) panel pokazuje pojedynczy odcinek.
+- Stan w `routing/useRouteDraft.ts`, szukanie w `api/geocode.ts`.
+- Własny endpoint `GET /search` (backend `app/search.py`, opis w kontrakcie 5.10, testy `test_search.py`): podpowiedzi ulic z naszej bazy, Photon tylko dla adresów/miejsc lub gdy backend nie działa. Zmiany backendu i kontraktu do wydzielenia do osobnych gałęzi/PR-ów (B1 jest właścicielem backendu).
+
+**Dalej / blokery:**
+- Piesi (`foot-walking`) nadal przez ORS lub przykładowe dane, bez własnego grafu.
+- Limit 2000 odcinków na odpowiedź (kontrakt 5.2): na dużym ekranie przy zoomie ok. 13 backend zwraca 422 „Przybliż mapę”, więc kolorów nie widać, dopóki się nie przybliży. Do rozważenia: pobieranie kafelkami po stronie frontu albo wyższy limit/agregacja po stronie backendu.
+- Kontrakt radzi pokazywać wyniki szacowane z grupy (`scores_source: "group"`) jaśniej na mapie: jeszcze nie zrobione.
+- Esri World Imagery nie jest w MAP_STACK: dopisać (osobny PR) po sprawdzeniu warunków.
+- Do pełnego Compose potrzebna konfiguracja bazy w `.env` (B1, `docs/B1_HANDOFF.md`); hasło DB wpisuje osoba z dostępem, nie w czat.
+- Photon/Nominatim (adresy, miejsca) są wołane bezpośrednio z przeglądarki; Photon nie jest w MAP_STACK. Do decyzji, czy zostawić.
+
 
 
 ## 2026-10-03 — Beata — gałąź `frontend/auth-rating`
