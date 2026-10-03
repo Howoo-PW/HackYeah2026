@@ -1,5 +1,5 @@
 // Types mirror docs/CONTRACT.md section 4. Change the contract first (separate PR), then this file.
-import type { FeatureCollection, LineString } from 'geojson'
+import type { FeatureCollection, Geometry, LineString, MultiLineString } from 'geojson'
 
 export type Dimension = 'surface' | 'views' | 'safety' | 'traffic' | 'parking'
 export type TimeOfDay = 'morning' | 'day' | 'evening' | 'night'
@@ -124,6 +124,23 @@ export type SegmentDetail = SegmentProperties & {
 }
 
 export type SegmentCollection = FeatureCollection<LineString, SegmentProperties>
+
+/** One fragment (300-700 m) on a zoomed-out map; `scores` has the same shape as on a segment (contract 5.2, GET /groups). */
+export type GroupMapProperties = {
+  id: number
+  kind: 'group'
+  name: string | null
+  highway: string
+  length_m: number
+  segments_count: number
+  ratings_count: number
+  scores: Scores
+  scores_source: 'own' | 'group' | 'none'
+}
+export type GroupMapCollection = FeatureCollection<MultiLineString, GroupMapProperties>
+
+/** What the map layer draws: segments or fragments, both carry `scores`. */
+export type MapCollection = FeatureCollection<Geometry, { scores: Scores; kind?: 'group' }>
 
 /** Map viewport, order as in the contract: minLon,minLat,maxLon,maxLat. */
 export type Bbox = [number, number, number, number]

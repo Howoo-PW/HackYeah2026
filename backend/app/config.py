@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     routing_provider: str = "ors"
     ors_api_key: SecretStr = SecretStr("")
     ors_base_url: str = "https://api.openrouteservice.org"
-    user_agent: str = "RateYourRide/0.1 (hackathon project)"
+    user_agent: str = "RateMyRoad/0.1 (hackathon project)"
 
     @property
     def cors_origin_list(self) -> list[str]:

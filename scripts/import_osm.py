@@ -47,7 +47,7 @@ OVERPASS_URLS = (
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
 )
-USER_AGENT = "RateYourRide-hackathon/0.1 (OSM seed import)"
+USER_AGENT = "RateMyRoad-hackathon/0.1 (OSM seed import)"
 
 
 def overpass(query: str, cache_name: str, refresh: bool) -> dict:

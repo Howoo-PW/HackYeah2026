@@ -52,7 +52,7 @@ return 1
 class RedisRateLimiter:
     """Share a sliding-window limit across backend processes with atomic Lua."""
 
-    def __init__(self, url: str, namespace: str = "rate-your-ride"):
+    def __init__(self, url: str, namespace: str = "rate-my-road"):
         self.client = Redis.from_url(url, socket_connect_timeout=2, socket_timeout=2)
         self.namespace = namespace
         self.script = self.client.register_script(LUA)

@@ -1,4 +1,4 @@
-# Rate Your Ride — kontrakt wspólny
+# Rate My Road — kontrakt wspólny
 
 Ten plik jest **jedynym źródłem prawdy** dla wszystkiego, co łączy frontend, backend, bazę i serwis AI: endpointów, formatów danych, nazw, enumów, portów i zmiennych środowiskowych.
 
@@ -121,7 +121,7 @@ type SegmentProperties = {
   active_obstacles_count: number;
 };
 
-type GroupRef = {             // grupa = kolejne kawałki jednej ulicy, ok. 500 m
+type GroupRef = {             // grupa (fragment) = 300–700 m drogi; krótsze kawałki łączone z sąsiadem
   id: number;
   name: string | null;
   highway: string;
@@ -282,11 +282,24 @@ Limit: max 2000 odcinków na odpowiedź. Przy większym obszarze → `422 VALIDA
 
 **Grupy i wynik efektywny.** OSM tnie drogi na każdym skrzyżowaniu, więc połowa odcinków ma
 poniżej 100 m i nikt ich nie oceni. Odcinki (`id`) i oceny zostają bez zmian. Dodatkowo kolejne
-kawałki jednej ulicy (ta sama nazwa i typ drogi) tworzą **grupę** po ok. 500 m. Wynik `scores`
+kawałki jednej ulicy (ta sama nazwa i typ drogi) tworzą **grupę** (fragment) po 300–700 m: ulica jest cięta tylko na
+skrzyżowaniach z ważnymi drogami (primary, secondary, tertiary), a fragment krótszy niż 300 m jest łączony z sąsiednim.
+Wynik `scores`
 odcinka liczy się tak: własne oceny odcinka (ważą tyle, co 2 oceny grupy), w przeciwnym razie
 średnia pozostałych odcinków grupy, ściągana do średniej typu drogi, gdy ocen jest mało.
 `scores_source` mówi, skąd wynik: `own`, `group` (szacunek, pokaż jaśniej) lub `none`.
 `rated_only` i `min_score` działają na wyniku efektywnym i filtrują po limicie 2000 odcinków.
+
+#### `GET /groups?bbox=` — P
+
+Fragmenty do widoku oddalonej mapy (cały Kraków to ok. 5 000, odpowiedź ok. 550 kB po gzip). Parametry jak w `GET /segments`
+(`bbox`, `dimension`, `min_score`, `rated_only`), ale `bbox` wychodzący poza Kraków jest **przycinany** do obszaru (poza
+obszarem: pusta lista), a nie odrzucany. Limit 6000; ponad → `422 VALIDATION_ERROR`.
+Odpowiedź: `FeatureCollection` z geometrią `MultiLineString` (uproszczoną, ok. 3 m) i `properties`:
+`id` (id fragmentu), `kind: "group"`, `name`, `highway`, `length_m`, `segments_count`, `ratings_count`,
+`scores` (średnia z wyników efektywnych odcinków, ważona długością), `scores_source`. `id` to id **fragmentu**,
+nie odcinka: klik na takiej linii powinien przybliżać mapę, a nie wołać `GET /segments/{id}`.
+Frontend: powyżej zoomu 15 odcinki (`GET /segments`), poniżej fragmenty.
 
 #### `GET /groups/{id}` — P
 

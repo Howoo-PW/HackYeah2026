@@ -1,4 +1,4 @@
-# Rate Your Ride — plan implementacji
+# Rate My Road — plan implementacji
 
 Źródła: [brief.md](brief.md) (zakres produktu) i [plan.md](plan.md) (wymagania techniczne i zasady pracy).
 

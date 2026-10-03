@@ -1,4 +1,4 @@
-# Rate Your Ride — oceń drogi jak restauracje
+# Rate My Road — oceń drogi jak restauracje
 
 ## Problem
 Nawigacja wybiera trasę według czasu, a nie jakości. Prowadzi pod adres, gdzie nie ma gdzie zaparkować, przez nierówną nawierzchnię i progi, na które nie jest gotowe niskie auto, albo przez nudną trasę, kiedy motocyklista chce ładnej. Pokazuje bieżące zdarzenia, ale nie to, gdzie jest niebezpiecznie na co dzień. Ładnej drogi nie da się polecić innym.
