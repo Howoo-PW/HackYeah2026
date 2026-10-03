@@ -20,7 +20,7 @@ function git(cmd) {
 let who = null;
 if (existsSync(roleFile)) {
   try {
-    who = JSON.parse(readFileSync(roleFile, 'utf8'));
+    who = JSON.parse(readFileSync(roleFile, 'utf8').replace(/^\uFEFF/, ''));
   } catch {
     who = null;
   }
@@ -28,7 +28,9 @@ if (existsSync(roleFile)) {
 
 const branch = git('branch --show-current') || '(brak)';
 const changes = git('status --short').split('\n').filter(Boolean).length;
-const lines = ['# Start sesji — Rate Your Ride', ''];
+const lines = ['# Start sesji — Rate Your Ride', '',
+  'Przed pracą przeczytaj .claude/skills/project-overview/SKILL.md, potem skill obszaru.',
+  'Sprawdź git status i git fetch. Zaktualizuj Stan/TODO skilla i overview po zmianach.', ''];
 
 if (who && ROLES[who.role]) {
   lines.push(`Osoba: ${who.name} (${who.role} — ${ROLES[who.role]}). Dziennik: docs/journal/${who.role}.md.`);
