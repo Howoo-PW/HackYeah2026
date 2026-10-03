@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     ai_base_url: str | None = None
     # "json_mode": for models that ignore tool/JSON schemas; the schema is then spelled out in the prompt.
     ai_structured_method: str | None = None
-    # OpenAI-compatible reasoning models (e.g. OpenRouter): "low" cuts latency a lot.
+    # Reasoning models: "minimal" (native OpenAI gpt-5 family) or "low" (OpenRouter) cuts latency a lot.
     ai_reasoning_effort: str | None = None
     ai_timeout_s: float = 12.0  # below the backend's 15 s timeout from the contract
 

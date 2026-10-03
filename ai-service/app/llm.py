@@ -25,13 +25,18 @@ Jeśli jezdni nie widać wyraźnie, ustaw confidence na "low"."""
 def _model():
     if not settings.ai_model:
         raise RuntimeError("AI_MODEL is not set")
-    kwargs = {"temperature": 0, "timeout": settings.ai_timeout_s, "max_retries": 1}
+    kwargs = {"timeout": settings.ai_timeout_s, "max_retries": 1}
     if settings.ai_api_key:
         kwargs["api_key"] = settings.ai_api_key
     if settings.ai_base_url:
         kwargs["base_url"] = settings.ai_base_url
-    if settings.ai_reasoning_effort:
-        kwargs["extra_body"] = {"reasoning": {"effort": settings.ai_reasoning_effort}}
+    if settings.ai_reasoning_effort and not settings.ai_base_url:
+        # Native OpenAI reasoning models (gpt-5 family) take reasoning_effort and reject temperature.
+        kwargs["reasoning_effort"] = settings.ai_reasoning_effort
+    else:
+        kwargs["temperature"] = 0
+        if settings.ai_reasoning_effort:  # OpenAI-compatible gateways such as OpenRouter
+            kwargs["extra_body"] = {"reasoning": {"effort": settings.ai_reasoning_effort}}
     return init_chat_model(settings.ai_model, model_provider=settings.ai_provider, **kwargs)
 
 

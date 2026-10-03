@@ -46,3 +46,34 @@ def test_default_method_leaves_the_prompt_alone(monkeypatch):
     monkeypatch.setattr(settings, "ai_structured_method", None)
     _, system = llm._structured(SummaryContent, "PROMPT")
     assert fake.calls == [{}] and system.content == "PROMPT"
+
+
+def _captured_model_kwargs(monkeypatch, **overrides):
+    seen = {}
+    monkeypatch.setattr(llm, "init_chat_model", lambda name, **kwargs: seen.update(name=name, **kwargs) or object())
+    llm._model.cache_clear()
+    for key, value in {"ai_model": "m", "ai_provider": "openai", "ai_api_key": "k", "ai_base_url": None,
+                       "ai_reasoning_effort": None, **overrides}.items():
+        monkeypatch.setattr(settings, key, value)
+    try:
+        llm._model()
+    finally:
+        llm._model.cache_clear()
+    return seen
+
+
+def test_native_openai_reasoning_model_gets_effort_and_no_temperature(monkeypatch):
+    seen = _captured_model_kwargs(monkeypatch, ai_model="gpt-5-nano", ai_reasoning_effort="minimal")
+    assert seen["reasoning_effort"] == "minimal"
+    assert "temperature" not in seen and "extra_body" not in seen
+
+
+def test_gateway_reasoning_uses_extra_body_and_keeps_temperature(monkeypatch):
+    seen = _captured_model_kwargs(monkeypatch, ai_base_url="https://openrouter.ai/api/v1", ai_reasoning_effort="low")
+    assert seen["extra_body"] == {"reasoning": {"effort": "low"}} and seen["temperature"] == 0
+    assert "reasoning_effort" not in seen
+
+
+def test_plain_model_gets_temperature_zero_only(monkeypatch):
+    seen = _captured_model_kwargs(monkeypatch)
+    assert seen["temperature"] == 0 and "reasoning_effort" not in seen and "extra_body" not in seen
