@@ -376,7 +376,8 @@ Odpowiedź: `201`, `Photo`.
 ```
 
 - `via`: opcjonalne, do 5 punktów pośrednich; trasa przechodzi przez nie w podanej kolejności (od `from` do `to`).
-  Brak = `[]`. Każdy punkt musi leżeć w Krakowie (`422 OUT_OF_AREA`, `details.field` = `"via[0]"`, …).
+  Brak = `[]`. Każdy punkt musi leżeć w obsługiwanym obszarze, tak jak `from` i `to` (sekcja 2): inaczej
+  `422 OUT_OF_AREA` z `details.field` = `"via[0]"`, `"via[1]"`, …
   Piesi (`foot-walking`) dostają przy `via` jedną trasę zamiast kilku alternatyw.
 - `profile`: `driving-car` / `cycling-regular` / `foot-walking`.
 - `weights`: 0–3 dla każdego wymiaru, brakujący = 0. Wszystkie 0 → sortowanie po czasie przejazdu.
