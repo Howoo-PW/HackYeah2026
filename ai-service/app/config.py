@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     mock_ai: bool = True
     ai_provider: str = "google_genai"
     ai_model: str = ""
+    ai_api_key: str | None = None
+    ai_base_url: str | None = None
+    ai_timeout_s: float = 12.0  # below the backend's 15 s timeout from the contract
 
 
 settings = Settings()
