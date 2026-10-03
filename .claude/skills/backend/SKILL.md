@@ -40,8 +40,8 @@ Dokumentacja: Context7, oficjalne Supabase/FastAPI/Psycopg/PyJWT.
 
 - backend/b1-howoo: core API, JWT i moderacja, bounded pool i transakcje.
 - Walidacja Krakowa, limit 2000 odcinków, paginacja max 100, oceny całkowite 1–5.
-- 70 testów core/routingu/Redis; test równoczesnych klientów sprawdza wspólną kwotę.
-- Routing scalony obok core; ORS jawnie wymaga klucza, mock wybierany konfiguracją.
+- Testy core/Redis; test równoczesnych klientów sprawdza wspólną kwotę.
+- Integrację routingu wycofano; health raportuje routing=not_configured.
 - scripts/verify_env.py i scripts/create_dev_admin.py (tylko APP_ENV=dev).
 - 22 plany zapytań SQL sprawdzone na online Supabase; obraz Docker Python 3.12
   zbudowany i test API w kontenerze PASS. Pełna integracja wymaga kluczy w .env.

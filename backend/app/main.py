@@ -13,7 +13,6 @@ from .core import router as core_router
 from .database import create_pool
 from .errors import install_error_handlers
 from .rate_limit import RedisRateLimiter
-from .routing.router import router as routing_router
 
 VERSION = "0.1.0"
 
@@ -46,7 +45,6 @@ app.add_middleware(
 
 api = APIRouter(prefix="/api/v1")
 api.include_router(core_router)
-api.include_router(routing_router)
 
 
 async def _check_ai() -> str:
@@ -80,10 +78,8 @@ def _check_database() -> str:
 
 
 def _check_routing() -> str:
-    # Avoid consuming routing provider quotas during each health poll.
-    if settings.routing_provider == "ors":
-        return "ok" if settings.ors_api_key.get_secret_value() else "not_configured"
-    return "ok" if settings.routing_provider == "mock" else "not_configured"
+    """Report that the AI team's routing module is not integrated on B1."""
+    return "not_configured"
 
 
 @api.get("/health", tags=["system"])

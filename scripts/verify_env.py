@@ -105,12 +105,7 @@ def main() -> int:
     missing = sorted(set(example) - set(env))
     report(not missing, "Komplet zmiennych .env", ", ".join(missing))
     config = {**env, **{key: os.environ[key] for key in example if key in os.environ}}
-    required = ["SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_DB_URL",
-                "INTERNAL_API_KEY", "VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY"]
-    if config.get("MOCK_AI", "true").lower() != "true":
-        required += ["AI_PROVIDER", "AI_MODEL", "AI_API_KEY"]
-    if config.get("ROUTING_PROVIDER", "ors") == "ors":
-        required += ["ORS_API_KEY"]
+    required = ["SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_DB_URL"]
     empty = [key for key in required if not config.get(key)]
     report(not empty, "Wymagane wartości konfiguracji", "Uzupełnij: " + ", ".join(empty))
 
@@ -149,11 +144,11 @@ def main() -> int:
         if started:
             deadline = time.monotonic() + 60
             while time.monotonic() < deadline:
-                if probe("http://localhost:8000/api/v1/health") and probe("http://localhost:8001/health") and probe("http://localhost:5173", False):
+                if probe("http://localhost:8000/api/v1/health", False) and probe("http://localhost:8001/health") and probe("http://localhost:5173", False):
                     break
                 time.sleep(2)
     if not args.skip_services:
-        for url, health in (("http://localhost:8000/api/v1/health", True), ("http://localhost:8001/health", True), ("http://localhost:5173", False)):
+        for url, health in (("http://localhost:8000/api/v1/health", False), ("http://localhost:8001/health", True), ("http://localhost:5173", False)):
             report(probe(url, health), url, "Uruchom python scripts/verify_env.py --start")
     git = executable("git")
     if git:

@@ -10,6 +10,7 @@ Z katalogu repo:
 python -m venv .venv
 .venv/Scripts/python.exe -m pip install -r backend/requirements-dev.txt
 .venv/Scripts/python.exe -m pytest -c backend/pytest.ini backend/tests -q
+docker compose up -d redis ai
 .venv/Scripts/python.exe -m uvicorn app.main:app --app-dir backend --port 8000 --reload
 ```
 
@@ -28,19 +29,20 @@ nie przekazuj go do frontendu. Nie ma lokalnej bazy ani produkcyjnych mocków co
 - Admin tylko z app_metadata, nigdy user_metadata. Zmiana roli w JWT staje się
   widoczna po odświeżeniu tokenu; frontend korzysta z Supabase Auth.
 - Oceny: 1 na użytkownika/odcinek/dzień Warszawy, atomowe zastąpienie 200/201.
-- Limity prób zapisu: 30 ocen/h i 10 komentarzy/h; routing 30/min na IP.
+- Limity prób zapisu: 30 ocen/h i 10 komentarzy/h.
   Atomowy limiter Redis współdzieli kwotę między procesami. Compose zachowuje
   dane w wolumenie AOF. Lokalny REDIS_URL: redis://localhost:16379/0.
 - Statystyki ocen liczone na żywo; segment_stats i jego odświeżanie pozostają u B2.
 - Moderacja komentarza usuwa cache AI odcinka. Publiczny odczyt tylko visible.
 - Health zwraca 503/down przy braku DB, 200/degraded przy niedostępnym AI/trasach.
-  Routing w health sprawdza konfigurację, bez zużywania limitu dostawcy.
+  Routing pozostaje not_configured do integracji modułu przez osobę AI.
 
 ## Integracja zespołu
 
-Routing i serwis AI scalono z core. Kolejne routery B2 montuj obok core_router.
+Na tym branchu jest wyłącznie core B1 oraz wspólne szkielety FE/AI z main.
+Routery B2/AI montuj obok core_router w osobnym kroku integracji.
 Zachowaj lifespan i obsługę błędów. Klucze SecretStr czytaj przez get_secret_value().
-Kontraktu nie zmieniono. Mock routingu wybieraj jawnie przez ROUTING_PROVIDER=mock.
+Kontraktu nie zmieniono. Klucze ORS i dostawcy AI nie są wymagane do pracy B1.
 
 ## Weryfikacja
 

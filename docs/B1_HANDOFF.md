@@ -1,50 +1,80 @@
-# B1 — wykonanie i dalsza konfiguracja
+﻿# B1 — uruchomienie i zakres pracy
 
-Branch użytkownika: `backend/b1-howoo`, opublikowany na origin.
-Pierwszy commit B1: `4bfdf0a`, integracja Redis/CI: `fbc4321`.
-Draft do przeglądu: [PR #2](https://github.com/Howoo-PW/HackYeah2026/pull/2).
-Scalono branche mapy, AI, routingu i migracje B2. Kod B1 pozostaje poza main.
+Branch: `backend/b1-howoo`. Draft: https://github.com/Howoo-PW/HackYeah2026/pull/2.
+Integracje frontend/map, ai/service i backend/routing wycofano nowym commitem
+bez przepisywania historii. Zostały core B1, JWT, odcinki, oceny, komentarze,
+moderacja, limiter Redis, testy, diagnostyka i CI. Migracje B2 są już w main.
+Frontend i AI wróciły do wspólnych szkieletów z main; mapa nie jest dostępna.
+Nie zmieniono danych Supabase ani ustawień zdalnych.
 
-## Zrealizowane kroki
+## Konfiguracja
 
-| Punkt | Wynik |
-|---|---|
-| 1. Konfiguracja | Publiczne klucze Supabase w ignorowanym .env; INTERNAL_API_KEY wygenerowany. Hasło DB i service_role odroczone na prośbę użytkownika. |
-| 2. Uruchomienie | Redis, mapa, backend i AI działają w kontenerach. Mapa, AI i trasy korzystają z danych demonstracyjnych. Seed online wymaga wskazania konta Supabase. |
-| 3. Testy | 70 testów backendu, 10 AI, frontend build/lint PASS. HTTP: 3 trasy mock i podsumowanie 5 komentarzy. GitHub Actions na fbc4321: PASS. Realne zapisy DB odroczone bez sekretów. |
-| 4. MCP | Context7 initialize/tools/list PASS; plugin Supabase działa. Bezpośredni Supabase MCP wymaga osobistego OAuth. |
-| 5. Integracja | FE, AI, routing i migracje B2 połączone na branchu B1; zachowano JWT, transakcje i wspólne błędy. |
-| 6. Wiele procesów | Limiter Redis z atomowym Lua, TTL i trwałym wolumenem; test równoczesnych klientów PASS. Routing 30/min na IP. |
-| 7. Ochrona main | Ustawiona i potwierdzona: PR, 1 akceptacja, checki backend/ai/frontend, zakaz force-push/usunięcia; także dla administratorów. |
+Nie nadpisuj istniejącego .env. Sekrety wpisuj tylko lokalnie.
+Core B1 wymaga SUPABASE_URL, SUPABASE_ANON_KEY i SUPABASE_DB_URL.
+Adres projektu i klucz publiczny zostały wcześniej uzupełnione.
 
-Konfiguracja: [.github/main-protection.json](../.github/main-protection.json).
-Wynik CI: [GitHub Actions](https://github.com/Howoo-PW/HackYeah2026/actions/runs/37140097666).
+SUPABASE_DB_URL: Supabase Dashboard → projekt → Connect → Transaction pooler.
+Skopiuj pełny connection string i zastąp placeholder hasłem bazy PostgreSQL.
+Znaki specjalne hasła zakoduj jako URL. Według dziennika B2 działa port 6543,
+a 5432 nie odpowiada z Dockera. Backend wymusza SSL i wyłącza prepared statements.
 
-## Dostęp lokalny
+REDIS_URL=redis://localhost:16379/0 dla pracy poza Dockerem.
+Compose automatycznie ustawia redis://redis:6379/0.
 
-- Mapa: http://localhost:5173
-- API: http://localhost:8000/docs
-- AI health: http://localhost:8001/health
-- Redis projektu: localhost:16379 (6379 zajęty przez inną usługę).
+SUPABASE_SERVICE_ROLE_KEY nie jest wymagany przez core B1 dla odczytów,
+ocen ani komentarzy. Potrzebują go skrypt admina dev i przyszły Storage B2.
+Legacy service_role znajdziesz w ustawieniach API Keys projektu.
+DEV_ADMIN_EMAIL i DEV_ADMIN_PASSWORD są potrzebne tylko do skryptu admina.
+Klucze AI i ORS nie są potrzebne dla tego brancha.
+Nie wklejaj sekretów do czatu ani do zmiennych VITE_*.
 
-Bez SUPABASE_DB_URL backend health prawidłowo zwraca HTTP 503/down.
-Frontend pokazuje dane demonstracyjne. Normalnie Compose czeka ze startem
-frontendu na zdrową bazę; demo uruchomiono osobno przez
-`docker compose up -d --no-deps frontend`.
+Źródła:
+- https://supabase.com/docs/guides/database/connecting-to-postgres
+- https://supabase.com/docs/guides/getting-started/api-keys
 
-## Brakujące dane
+## Uruchomienie w PowerShell
 
-Użytkownik wybrał kontynuowanie bez kluczy. Do pełnej integracji potrzebne są:
+Uruchom Docker Desktop, potem w katalogu repo:
 
-- SUPABASE_DB_URL: URL poolera z hasłem PostgreSQL, SSL wymagany.
-- SUPABASE_SERVICE_ROLE_KEY: wyłącznie backend/Storage i skrypt administratora.
-- DEV_ADMIN_EMAIL i DEV_ADMIN_PASSWORD: konto dev do rzeczywistej próby Auth.
-- ORS_API_KEY dla ROUTING_PROVIDER=ors; obecnie wybrano mock.
+```powershell
+docker compose up -d --build redis ai backend
+```
 
-Plugin Supabase nie udostępnia hasła DB ani service_role.
-Oba konta (Supabase i Primary) widzą ten sam projekt; przed zapisami
-narzędzia wymagają wskazania konta. Nie zmieniano zdalnych danych ani Auth.
+- API i Swagger: http://localhost:8000/docs
+- Health: http://localhost:8000/api/v1/health
+- Szkielet AI: http://localhost:8001/health
 
-Po uzupełnieniu sekretów: `python scripts/verify_env.py --start`, seed B2,
-próba loginu, ocena 201/200, komentarz, moderacja i odświeżenie mapy.
-Kontrakt API bez zmian. Sekrety i rola lokalna ignorowane przez git.
+Bez poprawnego DB URL Swagger działa, health zwraca 503/down,
+a operacje bazodanowe nie działają. Z bazą health może zwracać 200/degraded,
+ponieważ routing pozostaje niezintegrowany na B1.
+
+Opcjonalny ekran szkieletu frontendu (bez mapy):
+
+```powershell
+docker compose up -d --build --no-deps frontend
+```
+
+Otwórz http://localhost:5173.
+
+## Weryfikacja
+
+```powershell
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -r backend/requirements-dev.txt
+$env:REDIS_TEST_URL = 'redis://localhost:16379/0'
+.venv/Scripts/python.exe -m pytest -c backend/pytest.ini backend/tests -q
+.venv/Scripts/python.exe scripts/verify_env.py --skip-services
+```
+
+Diagnostyka sprawdza również narzędzia i MCP; ich brak nie oznacza błędu API.
+Testy API korzystają z zastępczego repozytorium i nie potwierdzają zapisów w DB.
+Po konfiguracji DB sprawdź publiczne GET /api/v1/segments w Swaggerze.
+Oceny i komentarze wymagają access tokenu użytkownika Supabase w nagłówku
+Authorization: Bearer <access_token>. Klucz anon nie zastępuje JWT.
+Seed i migracje utrzymuje B2; nie uruchamiaj ich ponownie w ramach B1.
+
+## Pozostało
+
+Uzupełnić połączenie DB i sprawdzić rzeczywiste odczyty, login, ocenę
+(201, następnie 200), komentarz i moderację. Integracja FE/AI jest osobnym
+zadaniem zespołu. Ochrona main ustawiona wcześniej pozostaje aktywna.
