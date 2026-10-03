@@ -15,6 +15,7 @@ Najpierw project-overview i docs/CONTRACT.md. API /api/v1; OpenAPI /docs.
   Supabase /auth/v1/user. Nigdy nie autoryzuj z user_metadata.
 - app/database.py: pula 0–5 połączeń, SSL, timeout, prepare_threshold=None
   dla Supavisor; synchroniczne route'y działają w wątkach, również na Windows.
+  `sslmode` bierze z adresu bazy (`?sslmode=disable` dla bazy w sieci prywatnej bez TLS), domyślnie `require`.
 - app/repository.py: parametryzowane SQL; schemat B2; żadnego DDL.
 - app/core.py: endpointy B1; app/schemas.py: Pydantic zgodny z kontraktem.
 - app/errors.py: wspólny format błędów; bez wartości wejścia i sekretów.
