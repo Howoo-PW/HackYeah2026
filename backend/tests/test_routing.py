@@ -123,6 +123,14 @@ async def test_ors_errors_use_contract_codes(response, status, code):
     assert (err.value.status, err.value.code) == (status, code)
 
 
+async def test_ors_unroutable_point_is_not_found_with_provider_code():
+    body = {"error": {"code": 2010, "message": "Could not find routable point within a radius of 350.0 meters"}}
+    with pytest.raises(AppError) as err:
+        await ors(lambda _: httpx.Response(404, json=body)).routes(Point(**RYNEK), Point(**WAWEL), "driving-car")
+    assert (err.value.status, err.value.code) == (404, "NOT_FOUND")
+    assert err.value.details == {"profile": "driving-car", "provider_code": 2010}
+
+
 async def test_ors_network_failure_is_upstream_error():
     def boom(_):
         raise httpx.ConnectError("down")

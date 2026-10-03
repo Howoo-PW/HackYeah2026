@@ -47,9 +47,20 @@ class OrsProvider:
 
         if res.status_code == 429:
             raise AppError(429, "RATE_LIMITED", "Routing provider quota exceeded")
+        if res.status_code == 404:
+            # ORS 2009/2010: no route, or no road for this profile within 350 m of a point (e.g. a pedestrian zone)
+            raise AppError(404, "NOT_FOUND", "No route found: a point is not near a road for this profile",
+                           {"profile": profile, "provider_code": self._error_code(res)})
         if res.status_code != 200:
             raise AppError(502, "UPSTREAM_ERROR", "Routing service error", {"status": res.status_code})
         return self._parse(res.json())
+
+    @staticmethod
+    def _error_code(res: httpx.Response) -> int | None:
+        try:
+            return res.json()["error"]["code"]
+        except (ValueError, KeyError, TypeError):
+            return None
 
     @staticmethod
     def _parse(data: dict) -> list[RawRoute]:
