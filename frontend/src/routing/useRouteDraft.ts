@@ -58,7 +58,7 @@ export function buildRouteRequest(d: RouteDraft): RouteRequest | null {
     to: { lat: d.b.lat, lon: d.b.lon },
     ...(via.length > 0 ? { via } : {}),
     profile: d.profile,
-    weights: d.weights,
+    weights: { ...d.weights, parking: 0 }, // routes are not planned around parking
   }
 }
 

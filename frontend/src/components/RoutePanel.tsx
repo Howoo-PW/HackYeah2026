@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Dimension, Place, RouteProfile, RouteResult } from '../api/types'
-import { DIMENSIONS, scoreColor } from '../lib/dimensions'
+import { ROUTE_DIMENSIONS, scoreColor } from '../lib/dimensions'
 import { activePoint, buildRouteRequest, getPoint, MAX_STOPS } from '../routing/useRouteDraft'
 import type { PointKey, RouteDraftApi } from '../routing/useRouteDraft'
 import type { RoutePlanApi } from '../routing/useRoutePlan'
@@ -102,7 +102,7 @@ export default function RoutePanel({ route, plan, onBack }: Props) {
 
         <SectionTitle className="mt-4">Wymagania</SectionTitle>
         <ul className="mt-1.5 space-y-3">
-          {DIMENSIONS.map((d) => (
+          {ROUTE_DIMENSIONS.map((d) => (
             <li key={d.id}>
               <RequirementSlider
                 label={d.label}
@@ -131,7 +131,6 @@ export default function RoutePanel({ route, plan, onBack }: Props) {
           Wyczyść wszystko
         </button>
 
-        <RequestPreview request={request} />
       </div>
     </section>
   )
@@ -347,7 +346,7 @@ function RouteCard({
       </div>
       {selected && route.score !== null && (
         <ul className="mt-2 space-y-1.5">
-          {DIMENSIONS.map((d) => {
+          {ROUTE_DIMENSIONS.map((d) => {
             const v = route.scores[d.id]
             return (
               <li key={d.id} className="text-xs">
@@ -364,18 +363,5 @@ function RouteCard({
         </ul>
       )}
     </button>
-  )
-}
-
-/** Shows what is sent to POST /route to POST /route (contract 5.8, plus `via` for stops). Display only. */
-function RequestPreview({ request }: { request: ReturnType<typeof buildRouteRequest> }) {
-  return (
-    <details className="mt-3 rounded-xl bg-gray-50 p-2 text-xs text-gray-600">
-      <summary className="cursor-pointer font-medium">Podgląd zapytania (dla programistów)</summary>
-      <p className="mt-2 text-gray-600">Pole `via` (przystanki) nie jest jeszcze w kontrakcie.</p>
-      <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all">
-        {request ? JSON.stringify(request, null, 2) : 'Ustaw punkty A i B.'}
-      </pre>
-    </details>
   )
 }

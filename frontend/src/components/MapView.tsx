@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Layer, Map, Marker, NavigationControl, Source } from 'react-map-gl/maplibre'
-import type { LayerSpecification } from 'maplibre-gl'
+import type { ExpressionSpecification, LayerSpecification } from 'maplibre-gl'
 import type { MapLayerMouseEvent, MapRef, ViewStateChangeEvent } from 'react-map-gl/maplibre'
 import type { LineLayerSpecification } from 'react-map-gl/maplibre'
 import { setWorkerUrl } from 'maplibre-gl'
@@ -25,7 +25,7 @@ const SATELLITE_TILES = 'https://server.arcgisonline.com/ArcGIS/rest/services/Wo
 const SATELLITE_ATTRIBUTION = 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
 
 /** Layers we add ourselves; never touched when restyling the base map. */
-const OWN_LAYERS = new Set(['segments', 'segments-casing', 'segment-selected', 'satellite', 'routes-casing', 'routes-line'])
+const OWN_LAYERS = new Set(['segments', 'segments-casing', 'segment-selected', 'segment-selected-inner', 'satellite', 'routes-casing', 'routes-line'])
 
 type StyleInfo = {
   /** Bottom-most layer of the base style: the satellite raster goes below it. */
@@ -237,6 +237,12 @@ export default function MapView({ routes, basemap, dimension, filter, selectedId
     [routes],
   )
 
+  // only segments (not the coarse fragments shown when zoomed out) can be selected
+  const selectedFilter = useMemo(
+    () => ['all', ['!=', ['get', 'kind'], 'group'], ['in', ['get', 'id'], ['literal', selectedIds]]] as ExpressionSpecification,
+    [selectedIds],
+  )
+
   const onClick = (e: MapLayerMouseEvent) => {
     if (routeMode) {
       onRouteClick({ lat: e.lngLat.lat, lon: e.lngLat.lng })
@@ -309,20 +315,29 @@ export default function MapView({ routes, basemap, dimension, filter, selectedId
               paint={{ 'line-color': '#ffffff', 'line-opacity': 0.9, 'line-width': ['interpolate', ['linear'], ['zoom'], 13, 7, 17, 14] }}
             />
           )}
+          {/* Selected street stretch: opaque blue outline with a thin white gap, drawn under the colored line so ratings stay visible. */}
+          <Layer
+            id="segment-selected"
+            type="line"
+            beforeId={styleInfo.labelId}
+            filter={selectedFilter}
+            layout={segmentsLayout}
+            paint={{ 'line-color': '#2563eb', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 7, 13, 12, 17, 26] }}
+          />
+          <Layer
+            id="segment-selected-inner"
+            type="line"
+            beforeId={styleInfo.labelId}
+            filter={selectedFilter}
+            layout={segmentsLayout}
+            paint={{ 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3.5, 13, 6.5, 17, 14] }}
+          />
           <Layer
             id="segments"
             type="line"
             layout={segmentsLayout}
             paint={basemap === 'satellite' ? satelliteLineColor : lineColor}
             beforeId={styleInfo.labelId}
-          />
-          <Layer
-            id="segment-selected"
-            type="line"
-            beforeId={styleInfo.labelId}
-            filter={['all', ['!=', ['get', 'kind'], 'group'], ['in', ['get', 'id'], ['literal', selectedIds]]]}
-            layout={{ 'line-cap': 'round' }}
-            paint={{ 'line-color': '#111827', 'line-width': ['interpolate', ['linear'], ['zoom'], 13, 9, 17, 18], 'line-opacity': 0.5 }}
           />
         </Source>
       )}
