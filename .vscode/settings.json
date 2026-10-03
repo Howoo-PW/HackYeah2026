@@ -1,0 +1,13 @@
+{
+  // Python: interpreter from the AI service venv (switch with "Python: Select Interpreter")
+  "python.defaultInterpreterPath": "${workspaceFolder}/ai-service/.venv/Scripts/python.exe",
+  "python.terminal.activateEnvironment": true,
+  // Both services use a top-level package named `app`; resolve it from ai-service
+  "python.analysis.extraPaths": ["${workspaceFolder}/ai-service"],
+
+  // Tests: pytest run from the ai-service folder
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.cwd": "${workspaceFolder}/ai-service",
+  "python.testing.pytestArgs": ["tests"]
+}

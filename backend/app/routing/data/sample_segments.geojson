@@ -1,0 +1,18 @@
+{
+  "type": "FeatureCollection",
+  "name": "SAMPLE DATA - not real ratings. Rynek -> Wawel with direct, east and west variants (see MockProvider).",
+  "features": [
+    {"type": "Feature", "properties": {"id": 9001, "surface": 4.0, "views": 3.0, "safety": 4.0, "traffic": 2.0, "parking": 2.0},
+     "geometry": {"type": "LineString", "coordinates": [[19.9373, 50.0617], [19.9363, 50.05785]]}},
+    {"type": "Feature", "properties": {"id": 9002, "surface": 4.0, "views": 3.0, "safety": 4.0, "traffic": 3.0, "parking": 2.0},
+     "geometry": {"type": "LineString", "coordinates": [[19.9363, 50.05785], [19.9353, 50.0540]]}},
+    {"type": "Feature", "properties": {"id": 9003, "surface": 3.0, "views": 5.0, "safety": 4.0, "traffic": 4.0, "parking": 3.0},
+     "geometry": {"type": "LineString", "coordinates": [[19.9373, 50.0617], [19.9393, 50.05785]]}},
+    {"type": "Feature", "properties": {"id": 9004, "surface": 3.0, "views": 5.0, "safety": 4.0, "traffic": 4.0, "parking": 3.0},
+     "geometry": {"type": "LineString", "coordinates": [[19.9393, 50.05785], [19.9353, 50.0540]]}},
+    {"type": "Feature", "properties": {"id": 9005, "surface": 2.0, "views": 2.0, "safety": 2.0, "traffic": 5.0, "parking": null},
+     "geometry": {"type": "LineString", "coordinates": [[19.9373, 50.0617], [19.9333, 50.05785]]}},
+    {"type": "Feature", "properties": {"id": 9006, "surface": 2.0, "views": 2.0, "safety": 3.0, "traffic": 5.0, "parking": null},
+     "geometry": {"type": "LineString", "coordinates": [[19.9333, 50.05785], [19.9353, 50.0540]]}}
+  ]
+}

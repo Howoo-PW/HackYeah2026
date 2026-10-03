@@ -10,6 +10,20 @@ x-python-dev: &python-dev
   restart: unless-stopped
 
 services:
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    ports:
+      - "127.0.0.1:16379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   ai:
     <<: *python-dev
     build: ./ai-service
@@ -23,6 +37,7 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+      start_period: 20s
 
   backend:
     <<: *python-dev
@@ -31,18 +46,22 @@ services:
     environment:
       WATCHFILES_FORCE_POLLING: "true"
       AI_SERVICE_URL: http://ai:8000 # inside the Compose network
+      REDIS_URL: redis://redis:6379/0
     volumes:
       - ./backend/app:/app/app
     ports:
       - "8000:8000"
     depends_on:
+      redis:
+        condition: service_healthy
       ai:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
       interval: 10s
-      timeout: 3s
+      timeout: 10s
       retries: 5
+      start_period: 20s
 
   frontend:
     build: ./frontend
@@ -58,3 +77,12 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5173').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  redis-data:
