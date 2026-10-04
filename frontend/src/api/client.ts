@@ -1,7 +1,7 @@
 import { metricScore, type Metric } from '../lib/dimensions'
 import { supabase } from '../lib/supabase'
 import { mockComments, mockSegmentDetail, mockSegments } from './mocks'
-import type { ApiError, Bbox, GroupDetail, NearestSegment, Opinion, Paginated, Rating, RatingInput, RouteRequest, RouteResult, GroupMapCollection, MyOpinion, SegmentCollection, SegmentDetail, StreetHit } from './types'
+import type { ApiError, Bbox, GroupDetail, NearestSegment, Opinion, Paginated, Rating, RatingInput, RouteRequest, RouteResult, GroupMapCollection, MyOpinion, Photo, SegmentCollection, SegmentDetail, StreetHit } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api/v1'
 /** Force mock data even when the backend is up (set VITE_USE_MOCKS=true). */

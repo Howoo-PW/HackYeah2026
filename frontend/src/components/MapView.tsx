@@ -268,7 +268,7 @@ export default function MapView({ routes, basemap, dimension, filter, only, sele
         ['!=', ['get', 'kind'], 'group'],
         ['in', ['get', 'id'], ['literal', selectedIds]],
         ...(primaryName ? [['==', ['get', 'name'], primaryName]] : []),
-      ] as ExpressionSpecification,
+      ] as unknown as ExpressionSpecification,
     [selectedIds, primaryName],
   )
   const primaryFilter = useMemo(
