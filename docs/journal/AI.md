@@ -4,6 +4,23 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+## 2026-10-04 — prukasz — gałąź `refactor/repo-cleanup`
+
+**Zadanie:** pełny refaktor repo (restrukturyzacja, usunięcie martwego kodu i zbędnych funkcji), potem inspekcja z wizualnym sprawdzeniem aplikacji.
+
+**Zrobione:**
+- baza: backend 277 testów PASS (29 pominięte, wymagają bazy), AI 43 PASS, frontend lint i `tsc -b` bez błędów
+- zakres uzgodniony z użytkownikiem: pełna restrukturyzacja, usunięcie jednorazowych skryptów i dokumentów roboczych
+- backend: `app/assistant/` (pakiet: api, data, facts, river, geocoding); `grouping.py` → `effective_scores.py` (martwe `build_groups` usunięte); `osm_access.py` i budowa fragmentów przeniesione do `scripts/` (nie trafiają już do obrazu backendu)
+- skrypty: `scripts/_common.py` (jedno czytanie `.env` i `SUPABASE_DB_URL` zamiast 7 kopii), `scripts/tests` + krok w CI, `scripts/README.md`; usunięte `check_core_sql.py` i martwa zmienna w `seed_zones.py`
+- frontend: `components/{map,segment,route,search,assistant}`; `api/client.ts` z jedną funkcją `send` (było 4 kopie obsługi błędów); usunięty tryb danych przykładowych (`mocks.ts`, `VITE_USE_MOCKS`, flaga `mock` w 5 plikach), martwy `zoomedOut`/`loading`, nieużywane eksporty; `@types/geojson` w devDependencies
+- dokumenty: `brief*.md` → `docs/`, usunięte `plan.md`, `problem-introduction.md`, `docs/B1_HANDOFF.md`; poprawione stare wzmianki o ORS/OSRM w planie, MAP_STACK i README backendu
+- testy: backend 191 PASS (29 pominięte), skrypty 84 PASS, AI 43 PASS, frontend lint + `tsc -b` + build bez błędów, ruff bez F/E9
+- inspekcja wizualna (Chrome headless na stosie z tej gałęzi): mapa miasta i odcinki, panel odcinka, panel trasy, asystent AI (trasa narysowana, odpowiedź prawdziwego modelu), satelita, mobile 390 px; brak błędów w konsoli i nieudanych żądań
+
+**Dalej / blokery:**
+- branche `backend/search-places` i `frontend/search-places` (autor Beciak2137) dotykają plików, które refaktor przenosi: konflikty rozwiązują ich autorzy
+
 ## 2026-10-04 — prukasz — gałąź `backend/ai-integration`
 
 **Zadanie:** podsumowanie AI ocen i opinii o ulicy (wcześniej backend tylko czytał pustą tabelę `segment_summaries`).

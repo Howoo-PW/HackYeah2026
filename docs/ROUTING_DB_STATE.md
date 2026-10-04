@@ -13,13 +13,13 @@ Stan bazy: 2026-10-04, projekt `lsfpirkqdtjkcaujnsde`. Zakres: **`driving-car` i
 | `segment_groups`, `segments.group_id` | **5 053 fragmenty** (mediana 534 m, 300–900 m), każdy odcinek ma fragment; ulica cięta tylko na skrzyżowaniach z ważnymi drogami, krótsze kawałki scalane z sąsiadem |
 | `routing_edge_group` (widok) | krawędź grafu → fragment (przez `segment_id` krawędzi); krawędzie bez odcinka (ok. 2/3, np. drogi serwisowe) nie mają fragmentu |
 | `segment_scores` (widok materializowany) | **wynik efektywny** odcinka w SQL: 5 wymiarów, `ratings_count`, `source` (`own`/`group`), `confidence`. Tylko odcinki z wynikiem (1 468 z 22 664). Odświeżany co 2 min |
-| `effective_score(...)` | ta sama reguła co `backend/app/grouping.py` (zgodność sprawdzona na wszystkich odcinkach) |
+| `effective_score(...)` | ta sama reguła co `backend/app/effective_scores.py` (zgodność sprawdzona na wszystkich odcinkach) |
 
 ### `osm_ways`: sieć dla auta i roweru
 
 Załadowana skryptem `scripts/load_osm_routing.py` (Overpass, 8 kafelków, cache w `data/osm_cache/`,
-ponowne uruchomienie nic nie kosztuje). Interpretacja tagów: `backend/app/osm_access.py` (testy w
-`backend/tests/test_osm_access.py`). Ten sam obszar co `segments`.
+ponowne uruchomienie nic nie kosztuje). Interpretacja tagów: `scripts/osm_access.py` (testy w
+`scripts/tests/test_osm_access.py`). Ten sam obszar co `segments`.
 
 | | Auto | Rower |
 |---|---|---|

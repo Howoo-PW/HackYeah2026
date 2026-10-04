@@ -12,7 +12,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_PATHS = (
     "backend", "ai-service", "frontend", "docs", "supabase", "scripts", "submission",
-    "README.md", "brief.md", "brief-short.md", "IMPLEMENTATION_PLAN.md",
+    "README.md", "IMPLEMENTATION_PLAN.md",
     ".env.example", ".gitignore", "docker-compose.yml",
 )
 EXTRAS = (

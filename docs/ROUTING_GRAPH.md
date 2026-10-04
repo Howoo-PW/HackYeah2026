@@ -107,7 +107,7 @@ krawędzie auta, roweru i pieszych); `not_configured` bez bazy; `error`, gdy gra
 ## Piesi
 
 Pieszy chodzi **po sieci dróg**, a nie po chodnikach (decyzja zespołu): chodniki i przejścia nie są modelowane, bo
-ulica, do której należą, ich zastępuje. Reguły w `backend/app/osm_access.py` (`foot_direction`):
+ulica, do której należą, ich zastępuje. Reguły w `scripts/osm_access.py` (`foot_direction`):
 
 - dostępne: wszystkie zwykłe drogi (`primary`…`residential`, `living_street`, `service`), ulice piesze (`pedestrian`),
   ścieżki (`path`), drogi gruntowe (`track`), `footway` (np. wspólne ścieżki dla pieszych i rowerów);
