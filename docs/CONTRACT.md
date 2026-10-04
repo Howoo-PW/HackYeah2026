@@ -384,7 +384,8 @@ Odpowiedź: `201`, `Photo`.
   "to": { "lat": 50.0470, "lon": 19.9440 },
   "via": [{ "lat": 50.0540, "lon": 19.9353 }],
   "profile": "driving-car",
-  "weights": { "surface": 2, "views": 1, "safety": 1, "traffic": 0, "parking": 0 }
+  "weights": { "surface": 2, "views": 1, "safety": 1, "traffic": 0, "parking": 0 },
+  "time_of_day": "evening"
 }
 ```
 
@@ -396,6 +397,13 @@ Odpowiedź: `201`, `Photo`.
 - Wszystkie profile: bez wag jedna trasa (najszybsza). Z wagami `rank: 1` to trasa najlepsza dla tych priorytetów, a
   `rank: 2` najszybsza (pomijana, gdy to ta sama trasa). Punkt dalej niż 600 m od drogi danego profilu →
   `404 NOT_FOUND` z `details.field` (`"from"`, `"via[i]"` lub `"to"`).
+- `time_of_day`: opcjonalne, `TimeOfDay` (sekcja 3). Brak → aktualna pora dnia w Warszawie (ta sama reguła co przy
+  `POST /segments/{id}/ratings`). Trasa i pokazane `scores` liczą oceny z tej pory dnia, zmieszane z ocenami ogólnymi
+  odcinka (oceny z pory mają tym większą wagę, im jest ich więcej); odcinek bez ocen z tej pory zachowuje ocenę ogólną.
+  Zła wartość → `422 VALIDATION_ERROR`.
+- Aktywne przeszkody (`GET /obstacles`) wpływają na trasy wszystkich profili: `closure` blokuje drogę, `accident`, `roadwork`,
+  `pothole` i `other` wydłużają czas przejazdu (`duration_s` zawiera opóźnienie). Odpowiedź nie zawiera listy przeszkód na
+  trasie.
 
 ```json
 {
