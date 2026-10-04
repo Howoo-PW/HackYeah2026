@@ -24,6 +24,7 @@ jobs:
           cache-dependency-path: backend/requirements*.txt
       - run: pip install -r backend/requirements-dev.txt
       - run: python -m pytest -c backend/pytest.ini backend/tests -q
+      - run: python -m pytest -c scripts/pytest.ini scripts/tests -q
 
   ai:
     runs-on: ubuntu-latest

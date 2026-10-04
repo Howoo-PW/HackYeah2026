@@ -69,10 +69,17 @@ Przycisk „Asystent AI” (lewy panel) otwiera `AssistantPanel`: opis słowami 
 `route.load` + `plan.adopt` (odpowiedź asystenta jako notatka w `RoutePanel`), miejsce na kartę miejsca, ulice jako numerowane pinezki (`pins` w `MapView`)
 i podświetlenie odcinków. Odpowiedź ma kilka sekund opóźnienia: pokazuj stan ładowania; błędy 429/502 mają polskie komunikaty.
 
+## Struktura (`frontend/src`)
+
+- `api/`: `client.ts` (jedna funkcja `send` dla wszystkich wywołań, błędy jako `ApiRequestError`), `types.ts` (typy z kontraktu), `geocode.ts`.
+- `auth/`: Supabase Auth, konto, `MyRoadsList`, `useMyOpinions`. `lib/`: wymiary i kolory, geolokalizacja, zdjęcia, klient Supabase.
+- `components/map` (MapView, FilterBar, Legend, BasemapSwitch, `useMapData`), `components/segment` (panel odcinka, ocena, opinie, zdjęcia),
+  `components/route` (RoutePanel, `useRouteDraft`, `useRoutePlan`, `planRoute`), `components/search` (SearchBox, PlaceCard), `components/assistant`.
+
 ## Stan
 
 - origin/frontend/map scalono: mapa, filtry i panel działają na localhost:5173.
-- Build i lint PASS. Bez DB frontend korzysta z oznaczonych danych demo.
+- Build i lint PASS. Danych przykładowych (mocków) już nie ma: gdy backend nie odpowiada, mapa pokazuje błąd.
 - Core B1 udostępnia kontrakt endpointów dla integracji FE.
 
 ## TODO

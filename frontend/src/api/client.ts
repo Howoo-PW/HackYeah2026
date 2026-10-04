@@ -1,11 +1,11 @@
 import { metricScore, type Metric } from '../lib/dimensions'
 import { supabase } from '../lib/supabase'
-import { mockComments, mockSegmentDetail, mockSegments } from './mocks'
 import type { ApiError, AssistantResponse, Bbox, GroupDetail, NearestSegment, Opinion, Paginated, Rating, RatingInput, RouteRequest, RouteResult, GroupMapCollection, MyOpinion, Photo, SegmentCollection, SegmentDetail, StreetHit } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api/v1'
-/** Force mock data even when the backend is up (set VITE_USE_MOCKS=true). */
-const FORCE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
+
+/** Fired after a rating, comment or photo is saved, so the opinions list and the map can refresh. */
+export const OPINIONS_CHANGED = 'opinions-changed'
 
 export class ApiRequestError extends Error {
   status: number
@@ -21,22 +21,66 @@ export class ApiRequestError extends Error {
   }
 }
 
-/** Sends a request; with `auth` the signed-in user's token goes along (when there is one), so the answer can include "my ..." fields. */
-async function request<T>(path: string, signal?: AbortSignal, post?: unknown, auth = false): Promise<T> {
-  const authorization = auth ? await optionalAuthHeader() : {}
-  const res = await fetch(`${API_URL}${path}`, {
-    signal,
-    headers: { ...authorization, ...(post !== undefined && { 'Content-Type': 'application/json' }) },
-    ...(post !== undefined && { method: 'POST', body: JSON.stringify(post) }),
-  })
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as ApiError | null
-    throw new ApiRequestError(res.status, body?.error.code ?? 'INTERNAL_ERROR', body?.error.message ?? res.statusText, body?.error.details ?? null)
-  }
-  return res.json() as Promise<T>
+/** `none`: public call; `optional`: the token goes along when the user is signed in; `required`: 401 error when nobody is. */
+type Auth = 'none' | 'optional' | 'required'
+
+type SendOptions = {
+  signal?: AbortSignal
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  /** JSON-encoded unless it is a `FormData` (multipart upload). */
+  body?: unknown
+  auth?: Auth
+  /** Announce a successful write on {@link OPINIONS_CHANGED}. */
+  changes?: boolean
+  /** Message for a network failure (no answer from the server at all). */
+  offline?: string
 }
 
-export type SegmentsResult = { data: SegmentCollection; mock: boolean }
+async function authHeaders(auth: Auth): Promise<Record<string, string>> {
+  if (auth === 'none') return {}
+  const { data } = (await supabase?.auth.getSession()) ?? { data: { session: null } }
+  if (data.session) return { Authorization: `Bearer ${data.session.access_token}` }
+  if (auth === 'required') throw new ApiRequestError(401, 'UNAUTHORIZED', 'Zaloguj się, aby to zrobić.')
+  return {}
+}
+
+/**
+ * Sends one API request and returns the parsed JSON (undefined for 204). Contract errors become `ApiRequestError`
+ * with the server's `error.code`, message and details; a network failure becomes status 0, code `NETWORK`.
+ * An aborted request rethrows the `AbortError`.
+ */
+async function send<T>(path: string, { signal, method = 'GET', body, auth = 'none', changes = false, offline = 'Brak połączenia z serwerem.' }: SendOptions = {}): Promise<T> {
+  const headers: Record<string, string> = await authHeaders(auth)
+  let payload: BodyInit | undefined
+  if (body instanceof FormData) payload = body
+  else if (body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+    payload = JSON.stringify(body)
+  }
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}${path}`, { signal, method, headers, body: payload })
+  } catch (err) {
+    if (signal?.aborted) throw err
+    throw new ApiRequestError(0, 'NETWORK', offline)
+  }
+  if (!res.ok) {
+    const error = (await res.json().catch(() => null)) as ApiError | null
+    throw new ApiRequestError(res.status, error?.error.code ?? 'INTERNAL_ERROR', error?.error.message ?? res.statusText, error?.error.details ?? null)
+  }
+  if (changes) window.dispatchEvent(new Event(OPINIONS_CHANGED))
+  return (res.status === 204 ? undefined : await res.json()) as T
+}
+
+/** Like {@link send}, but any failure (other than an abort) gives `null`: for helpers the UI can do without. */
+async function sendOrNull<T>(path: string, signal?: AbortSignal): Promise<T | null> {
+  try {
+    return await send<T>(path, { signal })
+  } catch (err) {
+    if (signal?.aborted) throw err
+    return null
+  }
+}
 
 export type SegmentFilter = {
   /** Metric the min score applies to. `overall` is filtered on the client (contract only filters by one dimension). */
@@ -46,63 +90,14 @@ export type SegmentFilter = {
   noObstacles: boolean
 }
 
-/**
- * GET /segments for the given viewport. Falls back to mock data when the backend is unreachable
- * (network error or 5xx); contract errors such as 422 "zoom in" are rethrown so the UI can show them.
- */
-export async function fetchSegments(bbox: Bbox, filter: SegmentFilter, signal?: AbortSignal): Promise<SegmentsResult> {
-  if (!FORCE_MOCKS) {
-    const params = new URLSearchParams({ bbox: bbox.map((n) => n.toFixed(5)).join(',') })
-    if (filter.dimension && filter.dimension !== 'overall' && filter.minScore !== null) {
-      params.set('dimension', filter.dimension)
-      params.set('min_score', String(filter.minScore))
-    }
-    try {
-      const data = await request<SegmentCollection>(`/segments?${params}`, signal)
-      return { data: clientFilter(data, filter), mock: false }
-    } catch (err) {
-      if (signal?.aborted) throw err
-      if (err instanceof ApiRequestError && err.status < 500) throw err
-    }
-  }
-  return { data: applyMockFilter(mockSegments(bbox), filter), mock: true }
-}
-
-/**
- * GET /groups?bbox= : fragments for zoomed-out views (the whole city is about 5 000 features). Unlike
- * {@link fetchSegments} there is no mock fallback; errors are rethrown for the UI.
- */
-export async function fetchGroupMap(bbox: Bbox, filter: SegmentFilter, signal?: AbortSignal): Promise<GroupMapCollection> {
+/** Query string of the map endpoints: the viewport plus the server-side part of the filter (one dimension and its minimum). */
+function mapParams(bbox: Bbox, { dimension, minScore }: SegmentFilter): URLSearchParams {
   const params = new URLSearchParams({ bbox: bbox.map((n) => n.toFixed(5)).join(',') })
-  if (filter.dimension && filter.dimension !== 'overall' && filter.minScore !== null) {
-    params.set('dimension', filter.dimension)
-    params.set('min_score', String(filter.minScore))
+  if (dimension && dimension !== 'overall' && minScore !== null) {
+    params.set('dimension', dimension)
+    params.set('min_score', String(minScore))
   }
-  return request<GroupMapCollection>(`/groups?${params}`, signal)
-}
-
-/**
- * GET /segments/{id}. Same mock fallback as {@link fetchSegments}. Sent with the user's token when signed in, so the road
- * comes back with the user's own rating, comment and photo (`my_rating`, `my_comment`, `my_photo`), also after a page reload.
- */
-export async function fetchSegmentDetail(id: number, signal?: AbortSignal): Promise<SegmentDetail> {
-  if (!FORCE_MOCKS) {
-    try {
-      try {
-        return await request<SegmentDetail>(`/segments/${id}`, signal, undefined, true)
-      } catch (err) {
-        // A stale token must not hide the road: read it as a visitor (without "my ..." fields).
-        if (err instanceof ApiRequestError && err.status === 401) return await request<SegmentDetail>(`/segments/${id}`, signal)
-        throw err
-      }
-    } catch (err) {
-      if (signal?.aborted) throw err
-      if (err instanceof ApiRequestError && err.status < 500) throw err
-    }
-  }
-  const detail = mockSegmentDetail(id)
-  if (!detail) throw new ApiRequestError(404, 'NOT_FOUND', 'Nie znaleziono odcinka')
-  return detail
+  return params
 }
 
 /** Filters the contract cannot do on the server: no active obstacles and the overall-score minimum. */
@@ -120,140 +115,76 @@ function clientFilter(data: SegmentCollection, { noObstacles, dimension, minScor
   return { ...data, features }
 }
 
-/** GET /segments/{id}/comments, newest first (typed as Opinion: see the note on that type). Same mock fallback as {@link fetchSegments}. */
-export async function fetchComments(id: number, page: number, pageSize: number, signal?: AbortSignal): Promise<Paginated<Opinion>> {
-  if (!FORCE_MOCKS) {
-    try {
-      return await request<Paginated<Opinion>>(`/segments/${id}/comments?page=${page}&page_size=${pageSize}`, signal)
-    } catch (err) {
-      if (signal?.aborted) throw err
-      if (err instanceof ApiRequestError && err.status < 500) throw err
-    }
-  }
-  return mockComments(id, page, pageSize)
+/** GET /segments for the given viewport (errors such as 422 "zoom in" are thrown for the UI to show). */
+export async function fetchSegments(bbox: Bbox, filter: SegmentFilter, signal?: AbortSignal): Promise<SegmentCollection> {
+  return clientFilter(await send<SegmentCollection>(`/segments?${mapParams(bbox, filter)}`, { signal }), filter)
 }
 
-/** Mock stand-in for the server-side filter (dimension + min_score) plus the client-side ones. */
-function applyMockFilter(data: SegmentCollection, filter: SegmentFilter): SegmentCollection {
-  const { dimension, minScore } = filter
-  const features = clientFilter(data, filter).features.filter((f) => {
-    if (dimension && dimension !== 'overall' && minScore !== null) {
-      const v = f.properties.scores[dimension]
-      return v !== null && v >= minScore
-    }
-    return true
-  })
-  return { ...data, features }
+/** GET /groups?bbox= : fragments for zoomed-out views (the whole city is about 5 000 features). */
+export async function fetchGroupMap(bbox: Bbox, filter: SegmentFilter, signal?: AbortSignal): Promise<GroupMapCollection> {
+  return send<GroupMapCollection>(`/groups?${mapParams(bbox, filter)}`, { signal })
 }
 
-/** Fired after a rating, comment or photo is saved, so the opinions list and the map can refresh. */
-export const OPINIONS_CHANGED = 'opinions-changed'
-
-/** `Authorization: Bearer <Supabase access token>` for the signed-in user; throws a 401 error when nobody is signed in. */
-async function authHeader(): Promise<Record<string, string>> {
-  const { data } = (await supabase?.auth.getSession()) ?? { data: { session: null } }
-  if (!data.session) throw new ApiRequestError(401, 'UNAUTHORIZED', 'Zaloguj się, aby to zrobić.')
-  return { Authorization: `Bearer ${data.session.access_token}` }
-}
-
-/** Like {@link authHeader}, but anonymous visitors simply get no header (public reads work for everybody). */
-async function optionalAuthHeader(): Promise<Record<string, string>> {
-  const { data } = (await supabase?.auth.getSession()) ?? { data: { session: null } }
-  return data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {}
-}
-
-/** Sends an authenticated write (JSON or multipart) and returns the parsed response. */
-async function write<T>(path: string, body: BodyInit, json: boolean, method = 'POST'): Promise<T> {
-  const headers = { ...(await authHeader()), ...(json && { 'Content-Type': 'application/json' }) }
-  let res: Response
+/**
+ * GET /segments/{id}. Sent with the user's token when signed in, so the road comes back with the user's own rating,
+ * comment and photo (`my_rating`, `my_comment`, `my_photo`), also after a page reload.
+ */
+export async function fetchSegmentDetail(id: number, signal?: AbortSignal): Promise<SegmentDetail> {
   try {
-    res = await fetch(`${API_URL}${path}`, { method, headers, body })
-  } catch {
-    throw new ApiRequestError(0, 'NETWORK', 'Brak połączenia z serwerem.')
+    return await send<SegmentDetail>(`/segments/${id}`, { signal, auth: 'optional' })
+  } catch (err) {
+    // A stale token must not hide the road: read it as a visitor (without "my ..." fields).
+    if (err instanceof ApiRequestError && err.status === 401) return send<SegmentDetail>(`/segments/${id}`, { signal })
+    throw err
   }
-  if (!res.ok) {
-    const err = (await res.json().catch(() => null)) as ApiError | null
-    throw new ApiRequestError(res.status, err?.error.code ?? 'INTERNAL_ERROR', err?.error.message ?? res.statusText, err?.error.details ?? null)
-  }
-  window.dispatchEvent(new Event(OPINIONS_CHANGED))
-  return res.json() as Promise<T>
+}
+
+/** GET /segments/{id}/comments, newest first (typed as Opinion: see the note on that type). */
+export async function fetchComments(id: number, page: number, pageSize: number, signal?: AbortSignal): Promise<Paginated<Opinion>> {
+  return send<Paginated<Opinion>>(`/segments/${id}/comments?page=${page}&page_size=${pageSize}`, { signal })
 }
 
 /** POST /segments/{id}/ratings: creates the user's rating of the road or replaces the previous one, whichever day (201 new / 200 replaced). Only filled dimensions are sent. */
 export async function postRating(segmentId: number, input: RatingInput): Promise<Rating> {
   const body = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== null && v !== undefined))
-  return write<Rating>(`/segments/${segmentId}/ratings`, JSON.stringify(body), true)
-}
-
-/** POST /segments/{id}/comments: the comment comes back with the author's latest rating of the road, when there is one. */
-export async function postComment(segmentId: number, text: string): Promise<Opinion> {
-  return write<Opinion>(`/segments/${segmentId}/comments`, JSON.stringify({ text }), true)
+  return send<Rating>(`/segments/${segmentId}/ratings`, { method: 'POST', body, auth: 'required', changes: true })
 }
 
 /** PUT /segments/{id}/comments/mine: writes the user's comment on the road, replacing the previous one (NOT IN docs/CONTRACT.md yet). */
 export async function putMyComment(segmentId: number, text: string): Promise<Opinion> {
-  return write<Opinion>(`/segments/${segmentId}/comments/mine`, JSON.stringify({ text }), true, 'PUT')
-}
-
-/** Sends an authenticated DELETE that answers 204 (no body). */
-async function remove(path: string): Promise<void> {
-  const headers = await authHeader()
-  let res: Response
-  try {
-    res = await fetch(`${API_URL}${path}`, { method: 'DELETE', headers })
-  } catch {
-    throw new ApiRequestError(0, 'NETWORK', 'Brak połączenia z serwerem.')
-  }
-  if (!res.ok) {
-    const err = (await res.json().catch(() => null)) as ApiError | null
-    throw new ApiRequestError(res.status, err?.error.code ?? 'INTERNAL_ERROR', err?.error.message ?? res.statusText, err?.error.details ?? null)
-  }
-  window.dispatchEvent(new Event(OPINIONS_CHANGED))
+  return send<Opinion>(`/segments/${segmentId}/comments/mine`, { method: 'PUT', body: { text }, auth: 'required', changes: true })
 }
 
 /** DELETE /segments/{id}/comments/mine: removes the user's own comment on the road (NOT IN docs/CONTRACT.md yet). */
 export async function deleteMyComment(segmentId: number): Promise<void> {
-  return remove(`/segments/${segmentId}/comments/mine`)
+  return send<void>(`/segments/${segmentId}/comments/mine`, { method: 'DELETE', auth: 'required', changes: true })
 }
 
 /** DELETE /segments/{id}/photos/mine: removes the user's own photos on the road, except `keepId` (the new one); NOT IN docs/CONTRACT.md yet. */
 export async function deleteMyPhotos(segmentId: number, keepId?: string): Promise<void> {
-  return remove(`/segments/${segmentId}/photos/mine${keepId ? `?keep=${encodeURIComponent(keepId)}` : ''}`)
+  return send<void>(`/segments/${segmentId}/photos/mine${keepId ? `?keep=${encodeURIComponent(keepId)}` : ''}`, { method: 'DELETE', auth: 'required', changes: true })
 }
 
 /** GET /segments/{id}/photos: visible photos with signed URLs, newest first. */
 export async function fetchPhotos(segmentId: number, page: number, pageSize: number, signal?: AbortSignal): Promise<Paginated<Photo>> {
-  return request<Paginated<Photo>>(`/segments/${segmentId}/photos?page=${page}&page_size=${pageSize}`, signal)
+  return send<Paginated<Photo>>(`/segments/${segmentId}/photos?page=${page}&page_size=${pageSize}`, { signal })
 }
 
 /** POST /segments/{id}/photos (multipart): JPEG / PNG / WebP up to 5 MB; the backend strips EXIF and makes a thumbnail. */
 export async function postPhoto(segmentId: number, file: File): Promise<Photo> {
   const form = new FormData()
   form.append('file', file)
-  return write<Photo>(`/segments/${segmentId}/photos`, form, false)
+  return send<Photo>(`/segments/${segmentId}/photos`, { method: 'POST', body: form, auth: 'required', changes: true })
 }
 
 /** GET /segments/{id}/street: ids of the whole street (same name, joined end to end) the road belongs to; null when it cannot be loaded. */
 export async function fetchStreetIds(segmentId: number, signal?: AbortSignal): Promise<number[] | null> {
-  try {
-    return (await request<{ segment_ids: number[] }>(`/segments/${segmentId}/street`, signal)).segment_ids
-  } catch {
-    return null
-  }
+  return (await sendOrNull<{ segment_ids: number[] }>(`/segments/${segmentId}/street`, signal))?.segment_ids ?? null
 }
 
-/**
- * GET /segments/nearest: the street under a point, used to show a name instead of coordinates.
- * Best effort: returns null when there is no segment within 50 m or the backend is unavailable.
- */
+/** GET /segments/nearest: the street under a point (null when there is no segment within 50 m or the backend is unavailable). */
 export async function fetchNearestSegment(lat: number, lon: number, signal?: AbortSignal): Promise<NearestSegment | null> {
-  if (FORCE_MOCKS) return null
-  try {
-    return await request<NearestSegment>(`/segments/nearest?lat=${lat}&lon=${lon}`, signal)
-  } catch (err) {
-    if (signal?.aborted) throw err
-    return null
-  }
+  return sendOrNull<NearestSegment>(`/segments/nearest?lat=${lat}&lon=${lon}`, signal)
 }
 
 /**
@@ -262,28 +193,12 @@ export async function fetchNearestSegment(lat: number, lon: number, signal?: Abo
  * so the caller can fall back to another source.
  */
 export async function fetchStreets(query: string, limit: number, signal?: AbortSignal): Promise<StreetHit[] | null> {
-  if (FORCE_MOCKS) return null
-  try {
-    const res = await request<{ items: StreetHit[] }>(`/search?q=${encodeURIComponent(query)}&limit=${limit}`, signal)
-    return res.items
-  } catch (err) {
-    if (signal?.aborted) throw err
-    return null
-  }
+  return (await sendOrNull<{ items: StreetHit[] }>(`/search?q=${encodeURIComponent(query)}&limit=${limit}`, signal))?.items ?? null
 }
 
-/**
- * GET /groups/{id}: the street stretch a segment belongs to. Best effort: null when the backend cannot
- * answer, in which case the panel simply shows the single segment.
- */
+/** GET /groups/{id}: the street stretch a segment belongs to (null when the backend cannot answer: the panel then shows the single segment). */
 export async function fetchGroup(id: number, signal?: AbortSignal): Promise<GroupDetail | null> {
-  if (FORCE_MOCKS) return null
-  try {
-    return await request<GroupDetail>(`/groups/${id}`, signal)
-  } catch (err) {
-    if (signal?.aborted) throw err
-    return null
-  }
+  return sendOrNull<GroupDetail>(`/groups/${id}`, signal)
 }
 
 /**
@@ -291,22 +206,13 @@ export async function fetchGroup(id: number, signal?: AbortSignal): Promise<Grou
  * Errors keep the server's message (e.g. 422 OUT_OF_AREA, 502 when the routing engine is down).
  */
 export async function fetchRoutes(req: RouteRequest, signal?: AbortSignal): Promise<RouteResult[]> {
-  try {
-    return (await request<{ routes: RouteResult[] }>('/route', signal, req)).routes
-  } catch (err) {
-    if (signal?.aborted || err instanceof ApiRequestError) throw err
-    throw new ApiRequestError(0, 'NETWORK', 'Nie można połączyć się z serwerem tras. Spróbuj ponownie.')
-  }
+  const res = await send<{ routes: RouteResult[] }>('/route', { signal, method: 'POST', body: req, offline: 'Nie można połączyć się z serwerem tras. Spróbuj ponownie.' })
+  return res.routes
 }
 
-/** GET /me/opinions: the signed-in user's own ratings and comments, newest first. Needs the Supabase access token. */
-export async function fetchMyOpinions(accessToken: string, signal?: AbortSignal): Promise<MyOpinion[]> {
-  const res = await fetch(`${API_URL}/me/opinions`, { signal, headers: { Authorization: `Bearer ${accessToken}` } })
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as ApiError | null
-    throw new ApiRequestError(res.status, body?.error.code ?? 'INTERNAL_ERROR', body?.error.message ?? res.statusText, body?.error.details ?? null)
-  }
-  return res.json() as Promise<MyOpinion[]>
+/** GET /me/opinions: the signed-in user's own ratings and comments, newest first. */
+export async function fetchMyOpinions(signal?: AbortSignal): Promise<MyOpinion[]> {
+  return send<MyOpinion[]>('/me/opinions', { signal, auth: 'required' })
 }
 
 /**
@@ -315,10 +221,5 @@ export async function fetchMyOpinions(accessToken: string, signal?: AbortSignal)
  * 502 AI unavailable).
  */
 export async function askAssistant(query: string, signal?: AbortSignal): Promise<AssistantResponse> {
-  try {
-    return await request<AssistantResponse>('/assistant', signal, { query })
-  } catch (err) {
-    if (signal?.aborted || err instanceof ApiRequestError) throw err
-    throw new ApiRequestError(0, 'NETWORK', 'Brak połączenia z serwerem.')
-  }
+  return send<AssistantResponse>('/assistant', { signal, method: 'POST', body: { query } })
 }

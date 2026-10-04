@@ -14,11 +14,11 @@ Needs: pip install "psycopg[binary]" shapely
 
 import argparse
 import collections
-import os
 import re
 import sys
 
 import psycopg
+from _common import database_url
 
 NODE_EPS = 0.000003  # about 0.3 m in degrees
 
@@ -126,9 +126,7 @@ def main():
     parser.add_argument("--edges", help="edge table in public with integer source/target columns")
     parser.add_argument("--osm-ways", choices=["car", "bike"], help="connectivity of the osm_ways network for a profile")
     args = parser.parse_args()
-    url = os.environ.get("SUPABASE_DB_URL")
-    if not url:
-        sys.exit("SUPABASE_DB_URL is not set")
+    url = database_url()
     with psycopg.connect(url, connect_timeout=15) as conn:
         conn.read_only = True
         if args.osm_ways:

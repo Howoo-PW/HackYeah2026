@@ -34,9 +34,9 @@ Scenariusz testów z oczekiwanymi wynikami:
 
 | Materiał | Plik |
 |---|---|
-| Krótki opis pomysłu | [brief-short.md](brief-short.md) |
+| Krótki opis pomysłu | [docs/brief-short.md](docs/brief-short.md) |
 | Problem i rozwiązanie | [submission/problem.md](submission/problem.md), [submission/solution.md](submission/solution.md) |
-| Opis projektu | [brief.md](brief.md) |
+| Opis projektu | [docs/brief.md](docs/brief.md) |
 | API i model danych | [docs/CONTRACT.md](docs/CONTRACT.md) |
 | Algorytm tras | [docs/ROUTING_GRAPH.md](docs/ROUTING_GRAPH.md) |
 | Asystent AI | [docs/ASSISTANT.md](docs/ASSISTANT.md) |

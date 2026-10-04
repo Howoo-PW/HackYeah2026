@@ -90,6 +90,6 @@ Krakowem, punkt za daleko od drogi i brak ocen to **nie błędy**, tylko `intent
 
 ## Pliki
 
-`ai-service/app/assistant_schemas.py`, `assistant_mock.py`, `llm.py`, `main.py` · `backend/app/assistant.py` (endpoint i potok), `assistant_facts.py` (zdania z faktów),
-`assistant_data.py` (SQL), `geocoding.py` (Nominatim) · `frontend/src/components/AssistantPanel.tsx`, `App.tsx` (obsługa wyniku) ·
+`ai-service/app/assistant_schemas.py`, `assistant_mock.py`, `llm.py`, `main.py` · `backend/app/assistant/`: `api.py` (endpoint i potok), `facts.py` (zdania z faktów),
+`data.py` (SQL), `geocoding.py` (Nominatim), `river.py` (punkty przy rzece) · `frontend/src/components/assistant/AssistantPanel.tsx`, `App.tsx` (obsługa wyniku) ·
 testy: `ai-service/tests/test_assistant.py`, `backend/tests/test_assistant.py`.

@@ -20,4 +20,4 @@ Kopiuj wartości do formularza w tej kolejności. Teksty długich pól są w oso
 - [ ] Sprawdzić limity długości pól w formularzu (teksty mają ok. 100–150 słów)
 - [ ] Wersja angielska, jeśli formularz tego wymaga (teraz tekst jest po polsku)
 
-Szersze opisy: [../brief-short.md](../brief-short.md) (pół strony), [../brief.md](../brief.md) (pełny).
+Szersze opisy: [../docs/brief-short.md](../docs/brief-short.md) (pół strony), [../docs/brief.md](../docs/brief.md) (pełny).

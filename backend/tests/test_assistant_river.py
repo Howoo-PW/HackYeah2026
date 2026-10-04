@@ -2,7 +2,7 @@
 
 import asyncio
 
-from app.assistant_river import BankPoint, candidates, pick_river_vias
+from app.assistant.river import BankPoint, candidates, pick_river_vias
 
 START, END = (50.0614, 19.9357), (50.0446, 19.9700)  # about 3 km apart, going south-east
 ON_WAY = [BankPoint("A", 50.0580, 19.9420), BankPoint("B", 50.0530, 19.9530), BankPoint("C", 50.0480, 19.9630)]

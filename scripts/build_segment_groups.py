@@ -1,7 +1,7 @@
 """Build rating fragments (segment_groups) from the segments table.
 
 Reads segments through SUPABASE_DB_URL (read only), merges them into fragments of 300-700 m
-(backend/app/grouping.py: cut only at junctions with important roads, shorter pieces merged into
+(scripts/fragments.py: cut only at junctions with important roads, shorter pieces merged into
 a neighbour) and writes:
 
   supabase/seed/groups_001.sql          INSERTs into public.segment_groups
@@ -21,17 +21,11 @@ segment ids) run this script again.
 
 import argparse
 import collections
-import os
 import statistics
-import sys
-from pathlib import Path
 
 import psycopg
-
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
-
-from app.grouping import IMPORTANT_HIGHWAYS, SegmentRow, build_fragments  # noqa: E402
+from _common import ROOT, database_url
+from fragments import IMPORTANT_HIGHWAYS, SegmentRow, build_fragments
 
 SEED_DIR = ROOT / "supabase" / "seed"
 UPDATES_PER_FILE = 5000
@@ -147,9 +141,7 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
-    url = os.environ.get("SUPABASE_DB_URL")
-    if not url:
-        sys.exit("SUPABASE_DB_URL is not set")
+    url = database_url()
     with psycopg.connect(url, connect_timeout=15) as conn:
         conn.execute("set statement_timeout = '300s'")
         segments, neighbors, important_at = load(conn)

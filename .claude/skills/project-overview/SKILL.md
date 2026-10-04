@@ -54,6 +54,10 @@ Stan opisuje bieżący branch; nie oznaczaj cudzych zmian jako scalonych.
 - 2026-10-05: własny graf tras (db/routing-graph, w main) i POST /route dla auta i roweru na grafie
   (backend/graph-routing). Piesi też z grafu, po drogach (db/foot-network, backend/foot-routing); ORS i mock usunięte.
 
+- 2026-10-04, refactor/repo-cleanup (AI): restrukturyzacja bez zmiany zachowania API. Backend: `app/assistant/`, `effective_scores.py`; skrypty: `scripts/_common.py`,
+  `fragments.py`, `osm_access.py`, `scripts/tests`; frontend: `components/{map,segment,route,search,assistant}`, jedna funkcja `send` w `api/client.ts`, tryb mock
+  usunięty; dokumenty: `docs/brief*.md`, usunięte notatki robocze (plan.md, problem-introduction.md, B1_HANDOFF.md) i `check_core_sql.py`.
+
 ## TODO
 
 - Piesi faza 2 (ścieżki w parkach) tylko w razie potrzeby; parkingi przy celu i trasy alternatywne w grafie;

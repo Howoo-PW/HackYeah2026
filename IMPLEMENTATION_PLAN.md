@@ -1,6 +1,6 @@
 # Rate My Road — plan implementacji
 
-Źródła: [brief.md](brief.md) (zakres produktu) i [plan.md](plan.md) (wymagania techniczne i zasady pracy).
+Źródło: [docs/brief.md](docs/brief.md) (zakres produktu). Dokument opisuje plan początkowy; stan bieżący jest w skillach (`.claude/skills/`).
 
 ## 0. Założenia i otwarte pytania
 
@@ -11,13 +11,11 @@
 | Baza | Tylko **Supabase online (Postgres + PostGIS)**. Brak lokalnej bazy i trybu offline (potwierdzone) |
 | Projekt Supabase | `HackYeah2026`, ref `lsfpirkqdtjkcaujnsde`, region `eu-central-1`, Postgres 17. Na 2026-10-03: brak tabel, PostGIS 3.3.7 i pgRouting 3.4.1 dostępne, ale niewłączone (włącza migracja w `db/schema`) |
 | Zdjęcia | Zdjęcia użytkowników w **Supabase Storage**, w bazie tylko metadane (tabela `segment_photos`) |
-| Auto-routing | W zakresie: trasy z zewnętrznego silnika (OpenRouteService lub OSRM) i ranking wg naszych ocen (sekcja 4) |
+| Trasy | Własny graf dróg w bazie (OSM, `find_route`) dla auta, roweru i pieszych, ranking wg ocen i wag użytkownika (sekcja 4, docs/ROUTING_GRAPH.md) |
 | Obszar | Tylko **Kraków**: bbox `49.967,19.792,50.126,20.217` (S,W,N,E) |
 | Wymiary ocen | nawierzchnia, widoki, bezpieczeństwo, obciążenie/problemy, parkingi; skala 1–5 |
 | Zespół | 4 osoby, podział w sekcji 8 |
 | Poza MVP | automatyczna ocena nawierzchni ze zdjęć (opcjonalnie, jeśli osoba od AI ma czas) |
-
-Stan gita na dziś (2026-10-03): katalog **nie jest repozytorium** — zawiera tylko `brief.md` i `plan.md`. Narzędzia lokalne: git 2.55, Docker 29.8, Python 3.14, Node 24.
 
 ## 1. Architektura
 
@@ -27,7 +25,7 @@ Stan gita na dziś (2026-10-03): katalog **nie jest repozytorium** — zawiera t
         │                             │                               │
         └── Supabase Auth (login) ────┤                               └──▶ dostawca LLM (dowolny, z .env)
                                       ├──▶ Supabase (Postgres + PostGIS, Storage na zdjęcia)
-                                      └──▶ silnik tras (OpenRouteService / OSRM)
+                                      └──▶ Redis (limity zapytań)
 ```
 
 - Każda usługa w osobnym kontenerze, spięte przez `docker-compose.yml`.
@@ -42,9 +40,12 @@ Stan gita na dziś (2026-10-03): katalog **nie jest repozytorium** — zawiera t
 ├── README.md                     # uruchomienie dla ludzi
 ├── docker-compose.yml
 ├── .env.example                  # lista zmiennych, bez wartości
+├── JURY.md, docker-compose.jury.yml, jury/   # uruchomienie dla jury (paczka ZIP)
 ├── docs/
 │   ├── CONTRACT.md               # wspólny kontrakt: API, typy, enumy, porty
 │   ├── MAP_STACK.md              # biblioteki i usługi mapowe, limity, dokumentacja
+│   ├── ROUTING_GRAPH.md, ROUTING_DB_STATE.md, ASSISTANT.md   # trasy i asystent AI
+│   ├── brief.md, brief-short.md  # opis produktu
 │   └── journal/                  # dziennik pracy: FE.md, B1.md, B2.md, AI.md
 ├── .gitignore                    # .env, node_modules, __pycache__, dist
 ├── .claude/
@@ -58,12 +59,10 @@ Stan gita na dziś (2026-10-03): katalog **nie jest repozytorium** — zawiera t
 ├── supabase/
 │   ├── migrations/               # SQL: schemat, RLS, widoki
 │   └── seed/                     # seed.sql + dane Krakowa z OSM
-├── scripts/
-│   ├── import_osm.py             # Overpass → odcinki i parkingi Krakowa
-│   └── verify_env.py             # weryfikacja środowiska po klonowaniu
-├── backend/                      # Python, FastAPI
+├── scripts/                      # narzędzia jednorazowe i diagnostyczne (scripts/README.md), testy w scripts/tests
+├── backend/app/                  # Python, FastAPI; assistant/ (asystent), routing/ (trasy), reszta: API, baza, auth
 ├── ai-service/                   # Python, FastAPI
-└── frontend/                     # React, Vite, TS, Tailwind, PWA
+└── frontend/src/                 # React, Vite, TS, Tailwind; api/, auth/, lib/, components/{map,segment,route,search,assistant}
 ```
 
 ## 3. Struktura danych (Supabase)
@@ -93,18 +92,16 @@ Wszystkie endpointy, formaty, enumy, porty i limity są w **[docs/CONTRACT.md](d
 Backend udostępnia dokumentację OpenAPI pod `/docs`. Musi się zgadzać z kontraktem.
 
 **Auto-routing** — silniki tras nie znają naszych ocen, więc:
-1. Backend pobiera z silnika 2–3 trasy alternatywne (OpenRouteService z darmowym kluczem albo publiczny serwer demo OSRM — oba z limitami, wystarczą na demo; sprawdzić aktualne warunki).
-2. Dopasowuje każdą trasę do odcinków w bazie (PostGIS: odcinki w buforze kilku metrów od linii trasy).
-3. Liczy wynik trasy: średnia ocen ważona długością odcinków i wagami użytkownika.
-4. Zwraca trasy posortowane wg wyniku, z oceną dla każdej.
+1. Backend przyłącza punkty do najbliższych węzłów własnego grafu dróg w bazie (OSM, `routing_snap`).
+2. `find_route` (SQL) szuka najtańszej trasy, koszt liczy z ocen odcinków i wag użytkownika; osobno najszybszej.
+3. Backend liczy wynik trasy: średnia ocen ważona długością odcinków i wagami użytkownika.
+4. Zwraca trasy z oceną i pokryciem ocenami (szczegóły: docs/ROUTING_GRAPH.md).
 
 **Serwis AI — dowolny dostawca**
 - Model wybierany przez `.env` (`AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`), bez zmian w kodzie.
 - LangChain tylko w minimalnym zakresie: `init_chat_model` (wybór dostawcy) i `with_structured_output` (odpowiedź jako model Pydantic z kontraktu). Bez łańcuchów i agentów.
 - Cała logika LangChain w jednym pliku `ai-service/app/llm.py`, reszta serwisu go nie importuje.
 - Na start darmowy plan dostawcy (np. Gemini, Groq, OpenRouter). Sprawdzić aktualne limity przed demo.
-
-Prawdziwe wyznaczanie trasy po naszych wagach (własny GraphHopper/Valhalla z danymi Krakowa) — dopiero po hackathonie.
 
 ## 5. Bezpieczeństwo
 
@@ -141,8 +138,6 @@ SUPABASE_DB_URL=
 CORS_ORIGINS=http://localhost:5173
 AI_SERVICE_URL=http://ai:8000
 INTERNAL_API_KEY=
-ROUTING_PROVIDER=ors
-ORS_API_KEY=
 DEV_ADMIN_EMAIL=
 DEV_ADMIN_PASSWORD=
 # ai-service

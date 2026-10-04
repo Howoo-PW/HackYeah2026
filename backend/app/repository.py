@@ -5,7 +5,7 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from .errors import AppError
-from .grouping import effective_scores, group_scores
+from .effective_scores import effective_scores, group_scores
 from . import summaries
 from .schemas import DIMENSIONS, RatingCreate, TimeOfDay
 
@@ -17,7 +17,7 @@ def _agg(alias: str = "") -> str:
 
 
 # Live aggregates, so a newly submitted score appears immediately. Each segment gets its own
-# ratings, those of its whole group and the mean of its road type; grouping.effective_scores
+# ratings, those of its whole group and the mean of its road type; effective_scores.effective_scores
 # combines them. The materialized segment_stats view stays available to B2's refresh job.
 SEGMENT_SELECT = f"""
 WITH hw AS (

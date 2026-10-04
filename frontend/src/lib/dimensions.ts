@@ -22,10 +22,6 @@ export const ROUTE_DIMENSIONS = DIMENSIONS.filter((d) => d.id !== 'parking')
 export const SCORE_COLORS = ['#ff0000', '#ff8c00', '#ffe600', '#80e000', '#00c800']
 export const NO_DATA_COLOR = '#9ca3af'
 
-export function dimensionLabel(id: Dimension): string {
-  return DIMENSIONS.find((d) => d.id === id)?.label ?? id
-}
-
 /** Color for a score, same stops as the map layer (used by legend and panel). */
 export function scoreColor(score: number | null): string {
   if (score === null) return NO_DATA_COLOR

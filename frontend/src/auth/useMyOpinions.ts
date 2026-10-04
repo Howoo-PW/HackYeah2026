@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchMyOpinions, OPINIONS_CHANGED } from '../api/client'
 import type { MyOpinion } from '../api/types'
-import { supabase } from '../lib/supabase'
 
 type Loaded = { userId: string; opinions: MyOpinion[] | null; failed: boolean }
 
@@ -18,14 +17,9 @@ export function useMyOpinions(userId: string | undefined) {
   }, [])
 
   useEffect(() => {
-    if (!supabase || !userId) return
+    if (!userId) return
     const controller = new AbortController()
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!data.session) throw new Error('no session')
-        return fetchMyOpinions(data.session.access_token, controller.signal)
-      })
+    fetchMyOpinions(controller.signal)
       .then((opinions) => setLoaded({ userId, opinions, failed: false }))
       .catch(() => !controller.signal.aborted && setLoaded({ userId, opinions: null, failed: true }))
     return () => controller.abort()

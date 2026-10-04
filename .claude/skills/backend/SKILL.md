@@ -17,7 +17,8 @@ Najpierw project-overview i docs/CONTRACT.md. API /api/v1; OpenAPI /docs.
   dla Supavisor; synchroniczne route'y działają w wątkach, również na Windows.
   `sslmode` bierze z adresu bazy (`?sslmode=disable` dla bazy w sieci prywatnej bez TLS), domyślnie `require`.
 - app/repository.py: parametryzowane SQL; schemat B2; żadnego DDL.
-- app/core.py: endpointy B1; app/schemas.py: Pydantic zgodny z kontraktem.
+- app/core.py: endpointy B1; app/schemas.py: Pydantic zgodny z kontraktem; app/effective_scores.py: wynik odcinka
+  ściągany do średniej fragmentu i typu drogi (grupowanie odcinków w fragmenty jest offline: scripts/fragments.py).
 - app/errors.py: wspólny format błędów; bez wartości wejścia i sekretów.
 - app/rate_limit.py: współdzielony Redis i atomowy Lua; Memory wyłącznie w testach.
   Compose używa redis:6379, lokalne skrypty localhost:16379.
@@ -25,8 +26,8 @@ Najpierw project-overview i docs/CONTRACT.md. API /api/v1; OpenAPI /docs.
 - app/routing/: `router.py` POST /route (limit 30/min na IP); `graph.py` auto i rower z własnego
   grafu w bazie (`find_route`, `routing_snap`, wagi użytkownika; opis w docs/ROUTING_GRAPH.md);
   `scoring.py` ogólny wynik trasy wg wag. Auto, rower i piesi z jednego grafu (ORS i mock usunięte).
-- app/assistant.py: `POST /assistant` (limit 10/min na IP): plan z serwisu AI → geokodowanie (`geocoding.py`, Nominatim z cache i limitem 1/s) →
-  trasa z grafu / miejsce / ranking fragmentów z `fragment_map` → fakty słowami (`assistant_facts.py`, SQL w `assistant_data.py`) → odpowiedź AI.
+- app/assistant/ (pakiet): `api.py` `POST /assistant` (limit 10/min na IP): plan z serwisu AI → geokodowanie (`geocoding.py`, Nominatim z cache i limitem 1/s) →
+  trasa z grafu / miejsce / ranking fragmentów z `fragment_map` → fakty słowami (`facts.py`, SQL w `data.py`, punkty przy rzece `river.py`) → odpowiedź AI.
   Opis w docs/ASSISTANT.md; kontrakt do uzupełnienia osobnym PR.
 - app/obstacles.py (B2): GET /obstacles, POST /obstacles (10/h), DELETE /admin/obstacles/{id}; własne
   `ObstacleRepository` i zależność `get_obstacle_repository`; aktywne przeszkody zmieniają trasy w grafie.
@@ -65,6 +66,9 @@ Dokumentacja: Context7, oficjalne Supabase/FastAPI/Psycopg/PyJWT.
 
 - 2026-10-04, backend/obstacles-time-of-day: endpointy przeszkód (kontrakt 5.5, 5.9) i ich wpływ na trasy auta, roweru
   i pieszych; pole `time_of_day` w `POST /route` (domyślnie aktualna pora w Warszawie) i oceny wg pory dnia w trasie.
+
+- 2026-10-04, refactor/repo-cleanup: `app/assistant/` jako pakiet; kod używany tylko przez skrypty (`osm_access`, budowa fragmentów, martwe
+  `build_groups`) przeniesiony do `scripts/` (obraz backendu mniejszy); `grouping.py` → `effective_scores.py`. Testy skryptów: `scripts/tests` (CI).
 
 ## TODO
 

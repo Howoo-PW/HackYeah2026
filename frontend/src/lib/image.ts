@@ -1,4 +1,4 @@
-export const PHOTO_MAX_BYTES = 5 * 1024 * 1024 // contract: photo up to 5 MB
+const PHOTO_MAX_BYTES = 5 * 1024 * 1024 // contract: photo up to 5 MB
 export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_SIDE = 2560
 

@@ -1,18 +1,15 @@
 """Create a demo administrator only in dev, with credentials from the ignored .env."""
 
-from pathlib import Path
+import os
 import sys
 
 import httpx
-from dotenv import dotenv_values
-
-ROOT = Path(__file__).resolve().parents[1]
+from _common import read_env_file
 
 
 def main() -> int:
     """Create an email-confirmed admin without logging email, password or keys."""
-    import os
-    config = {**dotenv_values(ROOT / ".env"), **os.environ}
+    config = {**read_env_file(), **os.environ}
     if config.get("APP_ENV") != "dev":
         print("[FAIL] Tworzenie administratora jest dozwolone tylko dla APP_ENV=dev")
         return 1
