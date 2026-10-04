@@ -15,6 +15,7 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 - Mapa: kolorowe odcinki wstawione pod warstwy etykiet (nazwy ulic nie są zasłonięte), etykiety ciemne z białym obrysem, nazwy ulic pogrubione (font Noto Sans Bold; Medium nie istnieje w OpenFreeMap). Widok satelitarny: przełącznik „Mapa / Satelita”, kafelki Esri World Imagery (warunki użycia do sprawdzenia przed demo, nie cache'ować offline w PWA), w satelicie zostają tylko białe etykiety i odcinki z białym obrysem.
 - Grupy odcinków (kontrakt 4): kliknięcie kawałka ulicy zaznacza na mapie całą grupę (ok. 500 m, `GET /groups/{id}`), a panel opisuje całą grupę (nazwa, długość, „od … do …”, średnie grupy, oceny grupy); „Szacunek na podstawie podobnych dróg” przy braku ocen. Bez grupy (mocki, backend niedostępny) panel pokazuje pojedynczy odcinek.
 - Filtry: usunięty przełącznik „Tylko ocenione”; bez emotek w panelu filtrów oraz na przyciskach „Filtry i kolory” i „Trasa”.
+- Panel trasy: usunięte „Wyczyść wszystko” i komunikat pod przyciskiem; przełącznik Mapa/Satelita przeniesiony na prawą stronę (obok zoomu), dzięki czemu panel trasy ma pełną wysokość okna i nie trzeba go przewijać do „Wyznacz trasę”.
 - Zaznaczenie ulicy na mapie: nieprzezroczysty niebieski obrys z białą przerwą pod kolorową linią ocen (bez ciemnych kropek na stykach odcinków).
 - Trasa nie uwzględnia parkingów: wymagania tylko dla 4 wymiarów (`ROUTE_DIMENSIONS`), waga parkingów zawsze 0 w zapytaniu i brak ich w ocenach trasy. Usunięty „Podgląd zapytania”.
 - Stan w `routing/useRouteDraft.ts`, szukanie w `api/geocode.ts`.
