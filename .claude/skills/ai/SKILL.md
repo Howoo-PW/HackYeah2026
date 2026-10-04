@@ -20,6 +20,19 @@ Zmiany wspólnego kontraktu w osobnym PR.
 
 ## Stan
 
+- 2026-10-04, backend/ai-integration: podsumowanie ocen i opinii działa na prawdziwym LLM. Backend (`app/summaries.py`)
+  przy `GET /segments/{id}` uruchamia w tle odświeżenie, gdy kliknięty odcinek ma >=5 własnych widocznych komentarzy albo choć jedno widoczne zdjęcie (samo zdjęcie wystarcza; /summarize przyjmuje wtedy `comments: []`) i brak cache albo >=5 nowych;
+  wysyła do AI 50 najnowszych komentarzy z oceną autora oraz średnie oceny odcinka (pola opcjonalne `scores`, `ratings_count`,
+  `comments[].rating` w /summarize; do kontraktu osobnym PR). Błąd AI: cooldown 5 min, czytanie komentarzy bez zmian.
+  Do 4 najnowszych zdjęć tego odcinka (podpisane URL-e na godzinę, `image_urls`) dołącza się do zapytania; AI analizuje każde zdjęcie
+  osobnym wywołaniem (`analyze_surface`: rodzaj, stan, pęknięcia, dziury) i podaje wynik słowami jako tekst `<photos>` do
+  podsumowania (obrazy wprost w wywołaniu podsumowania model ignorował); błąd analizy jednego zdjęcia je pomija. Nowe zdjęcie po dacie cache oraz
+  ukrycie zdjęcia (moderacja) odświeżają/unieważniają podsumowanie. Odpowiedź ma max 6 zdań i bez wartości liczbowych ocen. Na razie podsumowanie opiera się na komentarzach i zdjęciach:
+  oceny liczbowe są wyłączone flagą `SUMMARY_USE_RATINGS=false` (backend nie wysyła `scores`/`rating`); kod ocen i prompt zostały,
+  `SUMMARY_USE_RATINGS=true` je włącza. Podsumowanie, komentarze i zdjęcia dotyczą wyłącznie klikniętego odcinka (cache pod jego id); zapisany wiersz
+  jest pokazywany tylko, gdy odcinek ma nadal >=5 widocznych komentarzy albo zdjęcie.
+  `POST /admin/summaries/{segment_id}/refresh` wymusza przeliczenie. Odpowiedź odcinka ma `summary_pending` (FE: „Przygotowuję…”).
+
 - Serwis /summarize i routing scalone do backend/b1-howoo; kontenery działają w mock.
 - 10 testów AI PASS w kontenerze z LangChain; routing HTTP zwraca 3 alternatywy.
 
@@ -27,5 +40,6 @@ Zmiany wspólnego kontraktu w osobnym PR.
 
 - backend/routing: auto, rower i piesi idą z własnego grafu (docs/ROUTING_GRAPH.md); ORS i mock usunięte.
   Kalibrację kosztu (siła 8 auto / 3 rower i piesi) warto potwierdzić z AI.
-- backend/ai-integration: bezpieczny klient AI, cache i przeliczanie w tle.
+- Kontrakt (osobny PR): `summary_pending`, `scores`/`ratings_count`/`rating` w /summarize, `image_urls`, puste `comments` przy zdjęciu, `rating` w komentarzu, `/me/opinions`, `/segments/{id}/street`.
+- Cache jest przeliczany tylko po komentarzach i zdjęciach; zmiana samych ocen go nie odświeża. Limit AI na użytkownika brak (cooldown na odcinek).
 - Opcjonalnie analiza zdjęć dopiero po MVP i walidacji danych użytkownika.

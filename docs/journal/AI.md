@@ -4,6 +4,38 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+## 2026-10-04 — prukasz — gałąź `backend/ai-integration`
+
+**Zadanie:** podsumowanie AI ocen i opinii o ulicy (wcześniej backend tylko czytał pustą tabelę `segment_summaries`).
+
+**Zrobione:**
+- `backend/app/summaries.py`: kiedy odświeżać (>=5 widocznych komentarzy i brak cache albo >=5 nowych), zbudowanie zapytania (50 najnowszych komentarzy, każdy z oceną autora, plus średnie oceny odcinka), wywołanie `/summarize` z `X-Internal-Key` (timeout 15 s), zapis do `segment_summaries`; połączenie z bazą nie jest trzymane w czasie wywołania AI; po błędzie 5 min przerwy dla odcinka
+- `GET /segments/{id}` uruchamia odświeżenie w tle i zwraca `summary_pending`; `POST /admin/summaries/{segment_id}/refresh` (admin) przelicza od razu (502 przy błędzie AI, 422 poniżej 5 komentarzy)
+- serwis AI: opcjonalne `scores`, `ratings_count` i `comments[].rating`; prompt łączy średnią ocenę z komentarzami i wskazuje sprzeczności w `conflicts`
+- frontend: „Przygotowuję podsumowanie…” i ponowne pobranie co 5 s (max 5 razy)
+- testy: 38 w serwisie AI, 9 nowych dla odświeżania w backendzie (w kontenerze 213 PASS; 7 testów ORS wymaga pytest-asyncio, którego nie ma w obrazie)
+- przy okazji: tolerancja 10 s na `iat` w weryfikacji JWT (świeży token bywał odrzucany przez rozjazd zegarów), `exp` nadal ściśle
+
+- podsumowanie krótsze (max 6 zdań; w UI bez tematów „brak informacji”)
+- zdjęcia w podsumowaniu: do 4 najnowszych zdjęć fragmentu idą do modelu jako `image_urls`; nowe zdjęcie po dacie cache lub ukrycie zdjęcia (moderacja) odświeża/unieważnia podsumowanie; galeria w panelu pokazuje zdjęcia klikniętego odcinka
+
+- zakres: na prośbę wycofano podsumowanie na poziomie grupy; podsumowanie, komentarze, zdjęcia i oceny są wyłącznie klikniętego odcinka (usunięto `/groups/{id}/photos` i `/groups/{id}/comments`); wiersz cache bez >=5 własnych komentarzy nie jest pokazywany
+- tekst podsumowania bez wartości liczbowych ocen (liczby tylko pomagają modelowi)
+
+- oceny liczbowe w podsumowaniu wyłączone flagą `SUMMARY_USE_RATINGS=false` (tylko komentarze i zdjęcia); logika ocen zostaje w backendzie i AI, prompt dobiera reguły do tego, czy oceny przyszły
+
+- zdjęcia: obrazy wprost w wywołaniu podsumowania model (gpt-5.4-nano) ignorował, więc każde zdjęcie jest analizowane osobno (`analyze_surface`) i wynik słowami trafia do podsumowania; pęknięty asfalt jest teraz opisany; opisy pól nie mówią już „jeśli nikt nie wspomniał”
+- panel: tematy „brak informacji.” (z kropką) są ukrywane
+
+- podsumowanie może powstać z samego zdjęcia (odcinek bez komentarzy, `comments_count: 0`); /summarize przyjmuje puste `comments`, gdy są zdjęcia; panel pisze „na podstawie zdjęć”
+
+**Dalej / blokery:**
+- każdy odcinek ze zdjęciem dostaje podsumowanie przy pierwszym otwarciu (do 40 teraz): to wywołania AI, warto pilnować kosztu
+- pola `summary_pending`, `scores`/`rating` i `rating` w komentarzu, `image_urls` w /summarize oraz `/me/opinions` trzeba dopisać do kontraktu (osobny PR)
+- zmiana samych ocen nie przelicza cache; można dodać wiek cache
+- stan „Przygotowuję…” sprawdzono tylko po stronie backendu; w przeglądarce widziałem gotowe podsumowanie
+
+
 ## 2026-10-05 — prukasz — gałąź `ai/map-groups`
 
 **Zadanie:** mapa ma ładować większy obszar (oddalona mapa pokazywała tylko część, bo `GET /segments` odrzuca ponad 2000 odcinków: 422).
