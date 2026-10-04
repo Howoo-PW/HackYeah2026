@@ -12,17 +12,13 @@ replaces the previous batch. Needs SUPABASE_DB_URL (.env or environment). Determ
 
 import argparse
 import datetime as dt
-import os
 import random
-import sys
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import psycopg
 
-sys.path.insert(0, str(Path(__file__).parent))
-from load_seed import read_env_file  # noqa: E402
-from seed_zones import DIMS, clip, refresh  # noqa: E402
+from _common import database_url
+from seed_zones import DIMS, clip, refresh
 
 TAG = "vistula-2026-10"
 SEED = 20261008
@@ -117,9 +113,7 @@ def main():
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--remove", action="store_true")
     args = parser.parse_args()
-    url = os.environ.get("SUPABASE_DB_URL") or read_env_file().get("SUPABASE_DB_URL")
-    if not url:
-        sys.exit("SUPABASE_DB_URL is not set")
+    url = database_url()
     with psycopg.connect(url, connect_timeout=15, autocommit=False) as conn:
         conn.execute("set local statement_timeout = '600s'")
         conn.execute("set local search_path = public, extensions")

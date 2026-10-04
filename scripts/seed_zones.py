@@ -19,13 +19,12 @@ batch. Existing ratings are never touched. Rows are deterministic (fixed random 
 import argparse
 import datetime as dt
 import math
-import os
 import random
 import statistics
-import sys
 from zoneinfo import ZoneInfo
 
 import psycopg
+from _common import database_url
 
 TAG = "zones-2026-10"
 SEED = 20261005
@@ -104,7 +103,6 @@ def plan(segments, user_ids, taken=frozenset()):
                 (h0, h1), shift = BANDS[band]
                 day = today - dt.timedelta(days=rng.randint(0, 30))
                 local = dt.datetime.combine(day, dt.time(0), WARSAW) + dt.timedelta(hours=rng.uniform(h0, h1))
-                rated_on = local.date() if local.hour >= 0 else day
                 dims = list(DIMS) if rng.random() < 0.7 else rng.sample(DIMS, rng.randint(2, 4))
                 row = {d: clip(means[d] + character[d] + shift.get(d, 0) + rng.gauss(0, RATER_SD)) if d in dims else None for d in DIMS}
                 rows.append({"segment_id": sid, "user_id": user, **row, "time_of_day": band,
@@ -155,9 +153,7 @@ def main():
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--remove", action="store_true")
     args = parser.parse_args()
-    url = os.environ.get("SUPABASE_DB_URL")
-    if not url:
-        sys.exit("SUPABASE_DB_URL is not set")
+    url = database_url()
     with psycopg.connect(url, connect_timeout=15, autocommit=False) as conn:
         conn.execute("set local statement_timeout = '600s'")
         conn.execute("set local search_path = public, extensions")

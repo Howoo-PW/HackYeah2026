@@ -6,25 +6,21 @@
 
 Overpass is queried in 8 tiles, one request at a time with pauses, and every tile is cached in
 data/osm_cache/ (git-ignored), so a rerun costs nothing. Tag interpretation lives in
-backend/app/osm_access.py. Apply the osm_ways migration first. Needs SUPABASE_DB_URL for loading.
+scripts/osm_access.py. Apply the osm_ways migration first. Needs SUPABASE_DB_URL for loading.
 """
 
 import argparse
 import collections
 import json
 import math
-import os
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
-
-from app.osm_access import NONE, classify  # noqa: E402
+from _common import ROOT, database_url
+from osm_access import NONE, classify
 
 CACHE = ROOT / "data" / "osm_cache"
 MIN_LAT, MIN_LON, MAX_LAT, MAX_LON = 49.967, 19.792, 50.126, 20.217  # same area as the segments import
@@ -133,9 +129,7 @@ values (%(way_id)s, %(highway)s, %(name)s, %(oneway)s, %(junction)s, %(car_dir)s
 def load(rows: list[dict]) -> None:
     import psycopg
 
-    url = os.environ.get("SUPABASE_DB_URL")
-    if not url:
-        sys.exit("SUPABASE_DB_URL is not set")
+    url = database_url()
     with psycopg.connect(url, connect_timeout=15, autocommit=False) as conn:
         conn.execute("set local statement_timeout = '600s'")
         conn.execute("set local search_path = public, extensions")

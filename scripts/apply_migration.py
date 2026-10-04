@@ -7,34 +7,18 @@ The file is applied exactly as committed, so the repository and the database can
 Needs: pip install "psycopg[binary]"
 """
 
-import os
 import sys
 from pathlib import Path
 
 import psycopg
-
-ROOT = Path(__file__).resolve().parents[1]
-
-
-def read_env() -> dict[str, str]:
-    env = dict(os.environ)
-    path = ROOT / ".env"
-    if path.exists():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, _, value = line.partition("=")
-                env.setdefault(key.strip(), value.strip().strip('"').strip("'"))
-    return env
+from _common import database_url
 
 
 def main() -> None:
     if len(sys.argv) != 2:
         sys.exit(__doc__)
     path = Path(sys.argv[1])
-    url = read_env().get("SUPABASE_DB_URL")
-    if not url:
-        sys.exit("SUPABASE_DB_URL is not set (.env)")
+    url = database_url()
     sql = path.read_text(encoding="utf-8")
     with psycopg.connect(url, connect_timeout=15, autocommit=False) as conn:
         conn.execute("set local statement_timeout = '300s'")

@@ -8,15 +8,12 @@ New comments are embedded by the backend itself; this is for the ones written be
 """
 
 import argparse
-import os
 import sys
-from pathlib import Path
 
 import httpx
 import psycopg
 
-sys.path.insert(0, str(Path(__file__).parent))
-from load_seed import read_env_file  # noqa: E402
+from _common import setting
 
 BATCH = 64
 
@@ -29,9 +26,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    env = {**read_env_file(), **os.environ}
-    url, key = env.get("SUPABASE_DB_URL"), env.get("INTERNAL_API_KEY")
-    ai = env.get("AI_SERVICE_URL", "http://localhost:8001")
+    url, key = setting("SUPABASE_DB_URL"), setting("INTERNAL_API_KEY")
+    ai = setting("AI_SERVICE_URL", "http://localhost:8001")
     if ai.startswith("http://ai:"):  # the Compose-internal name is not reachable from the host
         ai = "http://localhost:8001"
     if not url or not key:

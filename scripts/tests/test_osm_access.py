@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.osm_access import (BACKWARD, BOTH, FORWARD, NONE, bike_direction, car_direction, classify, foot_direction,
+from osm_access import (BACKWARD, BOTH, FORWARD, NONE, bike_direction, car_direction, classify, foot_direction,
                             parse_maxspeed)
 
 

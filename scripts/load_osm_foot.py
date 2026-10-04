@@ -5,7 +5,7 @@
   python scripts/load_osm_foot.py --from-cache  # never touch Overpass
 
 1. Every way already in osm_ways gets foot_dir / foot_speed_kmh computed from its stored `tags`
-   (rules: backend/app/osm_access.py, foot_direction). No re-download of the road network.
+   (rules: scripts/osm_access.py, foot_direction). No re-download of the road network.
 2. highway=pedestrian ways (streets and squares of the old town...) that are not in osm_ways yet are downloaded
    from Overpass and inserted (cars and bikes usually may not use them; pedestrians may).
 Apply the foot migration first, rebuild the graph afterwards: select * from rebuild_routing();
@@ -15,20 +15,15 @@ Needs SUPABASE_DB_URL (.env) for loading; pip install "psycopg[binary]".
 import argparse
 import collections
 import json
-import os
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
-sys.path.insert(0, str(ROOT / "scripts"))
-
-import load_osm_routing as base  # noqa: E402
-from app.osm_access import FOOT_SPEED_KMH, NONE, foot_direction  # noqa: E402
+import load_osm_routing as base
+from _common import ROOT, database_url
+from osm_access import FOOT_SPEED_KMH, NONE, foot_direction
 
 CACHE = ROOT / "data" / "osm_cache" / "pedestrian.json"
 BBOX = f"{base.MIN_LAT},{base.MIN_LON},{base.MAX_LAT},{base.MAX_LON}"
@@ -75,9 +70,7 @@ def main() -> None:
 
     import psycopg
 
-    url = os.environ.get("SUPABASE_DB_URL")
-    if not url:
-        sys.exit("SUPABASE_DB_URL is not set")
+    url = database_url()
     with psycopg.connect(url, connect_timeout=15, autocommit=False) as conn:
         conn.execute("set local statement_timeout = '600s'")
         conn.execute("set local search_path = public, extensions")

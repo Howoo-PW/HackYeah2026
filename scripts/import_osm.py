@@ -28,9 +28,8 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+from _common import ROOT
 CACHE_DIR = ROOT / "scripts" / ".cache"
 SEED_DIR = ROOT / "supabase" / "seed"
 

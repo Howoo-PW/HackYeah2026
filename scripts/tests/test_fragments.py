@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 
-from app.grouping import SegmentRow, build_fragments
+from fragments import SegmentRow, build_fragments
 
 
 def seg(i, a, b, length=200.0, name="Długa", highway="residential", way=None):
@@ -130,3 +130,76 @@ def test_the_tail_of_a_street_goes_back_to_its_own_street_before_a_foreign_stub_
     dluga = [g for g in groups if g.name == "Długa"]
     assert [g.length_m for g in dluga] == [800.0]  # tail merged into its own street
     assert next(g for g in groups if 100 in g.segment_ids).length_m == 200.0  # the stub no longer fits
+
+
+# --- chains of one street (no cutting, no merging) ----------------------------------------------
+
+def chains(segs):
+    """Fragments of build_fragments with cutting and merging switched off: the plain chains of one street."""
+    return build_fragments(segs, touching(segs), {}, min_m=0.0, max_m=1e9)
+
+
+def by_member(groups):
+    return {sid: g for g in groups for sid in g.segment_ids}
+
+
+def test_consecutive_pieces_of_one_street_merge():
+    groups = chains([seg(1, (0, 0), (1, 0)), seg(2, (1, 0), (2, 0)), seg(3, (2, 0), (3, 0))])
+    assert len(groups) == 1
+    assert groups[0].segment_ids == [1, 2, 3] and groups[0].length_m == 600.0
+
+
+def test_a_crossing_street_does_not_break_the_chain_but_names_the_ends():
+    # Długa runs through a junction with Basztowa (a T from the north) and ends at Pędzichów.
+    segs = [
+        seg(1, (0, 0), (1, 0)),
+        seg(2, (1, 0), (2, 0)),
+        seg(3, (1, 0), (1, 1), name="Basztowa", highway="primary"),
+        seg(4, (2, 0), (3, 0), name="Pędzichów"),
+    ]
+    g = by_member(chains(segs))
+    assert g[1] is g[2]
+    assert g[1].segment_ids == [1, 2]            # Pędzichów is another street
+    assert g[1].to_street == "Pędzichów" and g[1].from_street is None
+    assert g[3] is not g[1]
+
+
+def test_street_forking_into_two_same_name_branches_is_not_merged_across():
+    segs = [seg(1, (0, 0), (1, 0)), seg(2, (1, 0), (2, 0)), seg(3, (1, 0), (2, 1))]
+    g = by_member(chains(segs))
+    assert len({id(g[1]), id(g[2]), id(g[3])}) == 3
+
+
+def test_different_road_type_or_name_never_merges():
+    segs = [seg(1, (0, 0), (1, 0)), seg(2, (1, 0), (2, 0), highway="tertiary"), seg(3, (2, 0), (3, 0), name="Inna")]
+    assert len(chains(segs)) == 3
+
+
+def test_unnamed_segments_merge_only_within_one_osm_way():
+    segs = [seg(1, (0, 0), (1, 0), name=None, way=7), seg(2, (1, 0), (2, 0), name=None, way=7),
+            seg(3, (2, 0), (3, 0), name=None, highway="cycleway", way=8)]
+    g = by_member(chains(segs))
+    assert g[1] is g[2] and g[3] is not g[1]
+
+
+def test_unnamed_pieces_merge_across_ways_only_at_a_plain_continuation():
+    chain = [seg(1, (0, 0), (1, 0), name=None, highway="cycleway", way=7),
+             seg(2, (1, 0), (2, 0), name=None, highway="cycleway", way=8)]
+    assert len(chains(chain)) == 1
+    with_branch = chain + [seg(3, (1, 0), (1, 1), name=None, highway="cycleway", way=9)]
+    assert len(chains(with_branch)) == 3
+    other_type = [chain[0], seg(2, (1, 0), (2, 0), name=None, highway="residential", way=8)]
+    assert len(chains(other_type)) == 2
+
+
+def test_closed_ring_does_not_loop_forever_and_keeps_every_segment():
+    ring = [seg(1, (0, 0), (1, 0)), seg(2, (1, 0), (1, 1)), seg(3, (1, 1), (0, 1)), seg(4, (0, 1), (0, 0))]
+    groups = chains(ring)
+    assert sorted(sid for g in groups for sid in g.segment_ids) == [1, 2, 3, 4]
+
+
+def test_every_segment_is_in_exactly_one_fragment_and_ids_do_not_depend_on_input_order():
+    segs = [seg(i, (i, 0), (i + 1, 0), length=120.0) for i in range(1, 30)]
+    a, b = fragments(segs), fragments(list(reversed(segs)))
+    assert [(g.id, sorted(g.segment_ids)) for g in a] == [(g.id, sorted(g.segment_ids)) for g in b]
+    assert sorted(sid for g in a for sid in g.segment_ids) == [s.id for s in segs]
