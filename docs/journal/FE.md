@@ -34,6 +34,22 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 - Opóźnienie 5–12 s (dwa wywołania modelu + geokodowanie + trasa); streaming odpowiedzi skróciłby czekanie.
 - „Moja lokalizacja” w opisie nie jest obsługiwana; punkt startu trzeba podać.
 
+## 2026-10-04 — Beata — gałąź `frontend/map-cache`
+
+**Zadanie:** mapa ma się ładować szybciej przy przesuwaniu: bufor (cache) i doczytywanie obszaru z wyprzedzeniem.
+
+**Zrobione:**
+- `src/map/useMapData.ts`: dane mapy w kafelkach (siatka 0,03° x 0,02°), cache w pamięci kluczowany filtrem i wersją danych; najpierw kafelki pod widokiem, potem pierścień wokół niego (doczytywanie w tle, do 4 równoległych zapytań); powrót w już wczytany obszar jest natychmiastowy.
+- Przy oddaleniu (fragmenty ulic) jedno zapytanie na całe miasto, potem z pamięci.
+- Kafelek, który backend odrzuca limitem 2000 odcinków (422), jest dzielony na 4 i scalany; duplikaty z granic kafelków usuwane; stare dane zostają widoczne do czasu wczytania nowych (bez mrugania pustą mapą); limit 90 kafelków w pamięci.
+- Zapisanie oceny (`OPINIONS_CHANGED`) unieważnia cache.
+- Pomiar w przeglądarce: start 1 zapytanie (fragmenty), po przybliżeniu 12 (widok + otoczenie), po przesunięciu tylko kolejne 4 w tle, bez pustych obszarów.
+
+**Dalej / blokery:**
+- Nagłówki cache po stronie backendu (ETag / Cache-Control dla `/segments`) przyspieszyłyby też pierwsze wczytanie (B1).
+
+
+
 ## 2026-10-04 — Beata — gałąź `frontend/routing`
 
 **Zadanie:** sprawdzić uruchomienie w Dockerze; widok wyboru trasy A→B z opcjami (sam wybór, bez routera i bez przekazywania danych).
