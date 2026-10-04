@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from .errors import AppError
 from .grouping import effective_scores, group_scores
+from . import summaries
 from .schemas import DIMENSIONS, RatingCreate, TimeOfDay
 
 def _agg(alias: str = "") -> str:
@@ -63,10 +64,18 @@ def enrich_segment(row: dict) -> dict:
 
 
 RATING_COLUMNS = "id, segment_id, surface, views, safety, traffic, parking, time_of_day, created_at"
+PHOTO_SELECT = "SELECT id, segment_id, storage_path, thumbnail_path, taken_at, status, created_at FROM public.segment_photos"
 COMMENT_SELECT = """
 SELECT c.id, c.segment_id, c.text, c.status, c.created_at,
-       jsonb_build_object('id', p.id, 'display_name', p.display_name) AS author
+       jsonb_build_object('id', p.id, 'display_name', p.display_name) AS author,
+       CASE WHEN r.id IS NULL THEN NULL ELSE to_jsonb(r) END AS rating
 FROM public.comments c JOIN public.profiles p ON p.id = c.user_id
+-- The author's latest rating of the same road, shown as stars next to the comment.
+LEFT JOIN LATERAL (
+    SELECT id, segment_id, surface, views, safety, traffic, parking, time_of_day, created_at
+    FROM public.ratings WHERE user_id = c.user_id AND segment_id = c.segment_id
+    ORDER BY created_at DESC LIMIT 1
+) r ON true
 """
 
 
@@ -158,6 +167,31 @@ class Repository:
             raise AppError(404, "NOT_FOUND", "Brak odcinka w promieniu 50 m")
         return enrich_segment(row)
 
+    def street(self, segment_id: int):
+        """The whole street the road belongs to: every road with the same name that is joined to it end to end.
+
+        Streets are cut into stretches (groups) that also pick up side streets, so the street is followed on the road graph itself:
+        from the clicked road to neighbours that have the same name and share an end point, and so on.
+        """
+        self.require_segment(segment_id)
+        row = self.conn.execute("""
+            WITH RECURSIVE named AS (
+                SELECT id, length_m, ST_SnapToGrid(ST_StartPoint(geom), 0.0000001) AS a, ST_SnapToGrid(ST_EndPoint(geom), 0.0000001) AS b
+                FROM public.segments WHERE name = (SELECT name FROM public.segments WHERE id = %(s)s) AND name IS NOT NULL
+            ), walk(id) AS (
+                SELECT id FROM named WHERE id = %(s)s
+                UNION
+                SELECT n.id FROM walk w JOIN named m ON m.id = w.id
+                JOIN named n ON n.a IN (m.a, m.b) OR n.b IN (m.a, m.b)
+            )
+            SELECT (SELECT name FROM public.segments WHERE id = %(s)s) AS name,
+                   coalesce(array_agg(w.id ORDER BY w.id), ARRAY[%(s)s]) AS segment_ids,
+                   coalesce(sum(n.length_m), 0)::float AS length_m
+            FROM walk w JOIN named n ON n.id = w.id
+        """, {"s": segment_id}).fetchone()
+        ids = row["segment_ids"] or [segment_id]
+        return {"name": row["name"], "segment_ids": ids, "length_m": row["length_m"] or 0}
+
     def group(self, group_id: int):
         """A street stretch for highlighting on the map: merged geometry, member ids, group scores."""
         row = self.conn.execute(f"""
@@ -193,9 +227,9 @@ class Repository:
         """, (segment_id,)).fetchall():
             bands[band["time_of_day"]] = {key: band[key] for key in DIMENSIONS}
         row["scores_by_time_of_day"] = bands
-        cached = self.conn.execute("SELECT summary, comments_count, model, updated_at FROM public.segment_summaries WHERE segment_id = %s", (segment_id,)).fetchone()
-        row["summary"] = ({**cached["summary"], "comments_count": cached["comments_count"],
-                           "model": cached["model"], "updated_at": cached["updated_at"]} if cached else None)
+        row["summary"] = summaries.cached(self.conn, segment_id)  # the summary of the whole street stretch
+        # True when a (new) AI summary is due; the route starts it in the background and the page shows "being prepared".
+        row["summary_pending"] = summaries.needs_refresh(self.conn, segment_id)
         row["obstacles"] = self.conn.execute("""
             SELECT id, segment_id, type, description, valid_until, reported_by, created_at,
                    jsonb_build_object('lat', ST_Y(geom), 'lon', ST_X(geom)) AS location
@@ -210,6 +244,19 @@ class Repository:
                 (segment_id, user_id),
             ).fetchone()
         return row
+
+    def my_opinions(self, user_id: UUID, limit: int = 100):
+        """The user's own ratings and comments (newest first) with the road names, hidden comments included."""
+        return self.conn.execute("""
+            SELECT 'rating' AS kind, r.id, r.segment_id, s.name AS segment_name, s.group_id, r.created_at, r.time_of_day::text AS time_of_day,
+                   r.surface::int, r.views::int, r.safety::int, r.traffic::int, r.parking::int, NULL::text AS text, NULL::text AS status
+              FROM public.ratings r JOIN public.segments s ON s.id = r.segment_id WHERE r.user_id = %(u)s
+            UNION ALL
+            SELECT 'comment', c.id, c.segment_id, s.name, s.group_id, c.created_at, NULL::text,
+                   NULL::int, NULL::int, NULL::int, NULL::int, NULL::int, c.text, c.status::text
+              FROM public.comments c JOIN public.segments s ON s.id = c.segment_id WHERE c.user_id = %(u)s
+            ORDER BY created_at DESC LIMIT %(n)s
+        """, {"u": user_id, "n": limit}).fetchall()
 
     def rate(self, segment_id: int, user_id: UUID, payload: RatingCreate, now: datetime):
         """Atomically replace the same user's daily rating and report 201 or 200."""
@@ -243,11 +290,38 @@ class Repository:
         row = self.conn.execute("INSERT INTO public.comments (segment_id, user_id, text) VALUES (%s, %s, %s) RETURNING id", (segment_id, user_id, text)).fetchone()
         return self.conn.execute(COMMENT_SELECT + " WHERE c.id = %s", (row["id"],)).fetchone()
 
+    def photos(self, segment_id: int, page: int, page_size: int):
+        """Visible photos of a road, newest first, as raw rows (storage paths still in place)."""
+        self.require_segment(segment_id)
+        total = self.conn.execute("SELECT count(*)::int AS count FROM public.segment_photos WHERE segment_id = %s AND status = 'visible'", (segment_id,)).fetchone()["count"]
+        items = self.conn.execute(PHOTO_SELECT + " WHERE segment_id = %s AND status = 'visible' ORDER BY created_at DESC, id DESC LIMIT %s OFFSET %s",
+                                  (segment_id, page_size, (page - 1) * page_size)).fetchall()
+        return {"items": items, "page": page, "page_size": page_size, "total": total}
+
+    def add_photo(self, segment_id: int, user_id: UUID, storage_path: str, thumbnail_path: str, taken_at: datetime | None):
+        """Insert a photo row for the verified identity; the files are already in storage."""
+        self.require_segment(segment_id)
+        return self.conn.execute("""
+            INSERT INTO public.segment_photos (segment_id, user_id, storage_path, thumbnail_path, taken_at)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id, segment_id, storage_path, thumbnail_path, taken_at, status, created_at
+        """, (segment_id, user_id, storage_path, thumbnail_path, taken_at)).fetchone()
+
+    def moderate_photo(self, photo_id: UUID, status: str):
+        """Hide or restore a photo after the router has verified administrator access."""
+        row = self.conn.execute("UPDATE public.segment_photos SET status = %s WHERE id = %s RETURNING id, segment_id, storage_path, thumbnail_path, taken_at, status, created_at",
+                                (status, photo_id)).fetchone()
+        if row is None:
+            raise AppError(404, "NOT_FOUND", "Nie znaleziono zdjęcia")
+        # The cached summary may describe a photo that is now hidden.
+        summaries.invalidate(self.conn, row["segment_id"])
+        return row
+
     def moderate_comment(self, comment_id: UUID, status: str):
         """Update visibility after the router has verified administrator access."""
         row = self.conn.execute("UPDATE public.comments SET status = %s WHERE id = %s RETURNING id", (status, comment_id)).fetchone()
         if row is None:
             raise AppError(404, "NOT_FOUND", "Nie znaleziono komentarza")
         # Cached summaries may contain text from a now-hidden comment.
-        self.conn.execute("DELETE FROM public.segment_summaries WHERE segment_id = (SELECT segment_id FROM public.comments WHERE id = %s)", (comment_id,))
+        summaries.invalidate(self.conn, self.conn.execute("SELECT segment_id FROM public.comments WHERE id = %s", (comment_id,)).fetchone()["segment_id"])
         return self.conn.execute(COMMENT_SELECT + " WHERE c.id = %s", (comment_id,)).fetchone()

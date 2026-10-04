@@ -6,3 +6,5 @@ PyJWT[crypto]==2.15.0
 psycopg[binary,pool]==3.3.3
 tzdata==2026.1
 redis==6.4.0
+pillow==11.3.0
+python-multipart==0.0.20

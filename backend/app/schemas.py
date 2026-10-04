@@ -94,6 +94,8 @@ class Comment(BaseModel):
     text: str
     status: Literal["visible", "hidden"]
     created_at: datetime
+    # The author's latest rating of the same road (NOT IN docs/CONTRACT.md yet).
+    rating: Rating | None = None
 
 
 class CommentPage(BaseModel):
@@ -101,6 +103,47 @@ class CommentPage(BaseModel):
     page: int
     page_size: int
     total: int
+
+
+class Street(BaseModel):
+    name: str | None
+    segment_ids: list[int]
+    length_m: float
+
+
+class Photo(BaseModel):
+    id: UUID
+    segment_id: int
+    url: str
+    thumbnail_url: str
+    taken_at: datetime | None
+    created_at: datetime
+
+
+class PhotoPage(BaseModel):
+    items: list[Photo]
+    page: int
+    page_size: int
+    total: int
+
+
+class MyOpinion(BaseModel):
+    """One of the signed-in user's own ratings or comments, with the road's name (NOT IN docs/CONTRACT.md yet)."""
+
+    kind: Literal["rating", "comment"]
+    id: UUID
+    segment_id: int
+    segment_name: str | None
+    group_id: int | None = None
+    created_at: datetime
+    time_of_day: TimeOfDay | None = None
+    surface: int | None = None
+    views: int | None = None
+    safety: int | None = None
+    traffic: int | None = None
+    parking: int | None = None
+    text: str | None = None
+    status: Literal["visible", "hidden"] | None = None
 
 
 class Profile(BaseModel):
@@ -234,6 +277,8 @@ class SegmentDetail(SegmentProperties):
     last_rating_at: datetime | None
     scores_by_time_of_day: dict[TimeOfDay, Scores]
     summary: Summary | None
+    # Extension (NOT IN docs/CONTRACT.md yet): an AI summary is being prepared in the background.
+    summary_pending: bool = False
     obstacles: list[Obstacle]
     photos_count: int
     my_rating: Rating | None
