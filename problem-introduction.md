@@ -1,3 +1,0 @@
-Chyba każdy korzystając z automatycznej nawigacji został wyprowadzony na tak zwane "manowce". Nawigacja sugeruje dojaz do miejsca - ale nagle okazuje się, że w promieniu kilku przecznic wszystkie miejsca parkingowe są zajęte. Posidacze samochodu z niskim zawieszeniem musili zawrócic przez nierówną powierzchnię i za wysokie progi zwalniające. Na drodze codziennie zdarzają się wypadki - nawigacja pokaże tylko aktualne ale nie statystyki. planujesz jazdę motocyklem ale wybrana trasa jest nurząca - aplikacja zasugeruje Ci alterantywną trasę. 
-Przejechałeś ładną droga i checesz ją polecić innym - w normalnej nawigacji nie jest to dostępne
-W skrócie oceń drogi jak restauracje. 

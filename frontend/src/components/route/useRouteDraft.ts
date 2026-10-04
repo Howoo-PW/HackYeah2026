@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
-import { fetchNearestSegment } from '../api/client'
-import type { Dimension, LatLon, Place, RouteProfile, RouteRequest, RouteWeights } from '../api/types'
-import { inKrakow } from '../lib/dimensions'
+import { fetchNearestSegment } from '../../api/client'
+import type { Dimension, LatLon, Place, RouteProfile, RouteRequest, RouteWeights } from '../../api/types'
+import { inKrakow } from '../../lib/dimensions'
 
 /** 'a' = start, 'b' = destination, a number = index of an intermediate stop. */
 export type PointKey = 'a' | 'b' | number
@@ -19,7 +19,7 @@ export type RouteDraft = {
   weights: RouteWeights
 }
 
-export const NO_WEIGHTS: RouteWeights = { surface: 0, views: 0, safety: 0, traffic: 0, parking: 0 }
+const NO_WEIGHTS: RouteWeights = { surface: 0, views: 0, safety: 0, traffic: 0, parking: 0 }
 
 const INITIAL: RouteDraft = { a: null, b: null, stops: [], picking: null, profile: 'driving-car', weights: NO_WEIGHTS }
 

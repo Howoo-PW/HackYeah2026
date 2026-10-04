@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import { ApiRequestError, askAssistant } from '../api/client'
-import type { AssistantResponse, AssistantStreet } from '../api/types'
+import { ApiRequestError, askAssistant } from '../../api/client'
+import type { AssistantResponse, AssistantStreet } from '../../api/types'
 
 const EXAMPLES = [
   'Rowerem z Rynku Głównego na Wawel, ładne widoki',

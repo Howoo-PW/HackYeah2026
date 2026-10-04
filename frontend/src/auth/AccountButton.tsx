@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MyOpinion } from '../api/types'
-import MyRoadsList from '../components/MyRoadsList'
+import MyRoadsList from './MyRoadsList'
 import { displayNameOf } from './authContext'
 import { useAuth } from './useAuth'
 

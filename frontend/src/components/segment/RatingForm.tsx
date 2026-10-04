@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { ApiRequestError, deleteMyComment, deleteMyPhotos, postPhoto, postRating, putMyComment } from '../api/client'
-import type { Dimension, Opinion, Photo, Rating, TimeOfDay } from '../api/types'
-import { useAuth } from '../auth/useAuth'
-import { DIMENSIONS } from '../lib/dimensions'
-import { PHOTO_TYPES, fitForUpload } from '../lib/image'
+import { ApiRequestError, deleteMyComment, deleteMyPhotos, postPhoto, postRating, putMyComment } from '../../api/client'
+import type { Dimension, Opinion, Photo, Rating, TimeOfDay } from '../../api/types'
+import { useAuth } from '../../auth/useAuth'
+import { DIMENSIONS } from '../../lib/dimensions'
+import { PHOTO_TYPES, fitForUpload } from '../../lib/image'
 
 const COMMENT_MAX = 1000 // contract: comment text 1-1000 characters
 

@@ -6,14 +6,14 @@ import type { LineLayerSpecification } from 'react-map-gl/maplibre'
 import { setWorkerUrl } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { OPINIONS_CHANGED } from '../api/client'
-import { SEGMENT_ZOOM, useMapData } from '../map/useMapData'
-import type { Bbox, LatLon, Place } from '../api/types'
-import { KRAKOW_BBOX, KRAKOW_CENTER, NO_DATA_COLOR, SCORE_COLORS, metricScore } from '../lib/dimensions'
-import { OUTSIDE_AREA_TEXT, geolocationErrorText, inServiceArea } from '../lib/geolocation'
-import type { Metric } from '../lib/dimensions'
-import type { PointKey } from '../routing/useRouteDraft'
-import type { SegmentFilter } from '../api/client'
+import { OPINIONS_CHANGED } from '../../api/client'
+import { SEGMENT_ZOOM, useMapData } from './useMapData'
+import type { Bbox, LatLon, Place } from '../../api/types'
+import { KRAKOW_BBOX, KRAKOW_CENTER, NO_DATA_COLOR, SCORE_COLORS, metricScore } from '../../lib/dimensions'
+import { OUTSIDE_AREA_TEXT, geolocationErrorText, inServiceArea } from '../../lib/geolocation'
+import type { Metric } from '../../lib/dimensions'
+import type { PointKey } from '../route/useRouteDraft'
+import type { SegmentFilter } from '../../api/client'
 
 // MapLibre 6 needs the worker file URL explicitly under Vite (docs/MAP_STACK.md).
 setWorkerUrl(workerUrl)
@@ -91,7 +91,8 @@ type Props = {
   placing: boolean
   onRouteClick: (p: LatLon) => void
   onRouteDrag: (key: PointKey, p: LatLon) => void
-  onStatus: (s: { mock: boolean; error: string | null; zoomedOut: boolean; loading: boolean }) => void
+  /** Gets the error of the map data (null when everything loaded). */
+  onError: (message: string | null) => void
 }
 
 const lineColor: LineLayerSpecification['paint'] = {
@@ -130,7 +131,7 @@ const ROUTE_PINS = [
 ] as const
 
 /** Map with segments colored by the chosen dimension; reports clicks as segment ids. */
-export default function MapView({ routes, basemap, dimension, filter, only, selectedIds, primaryId, onSelect, focus, placeMarker, pins, routeMode, routePoints, placing, onRouteClick, onRouteDrag, onStatus }: Props) {
+export default function MapView({ routes, basemap, dimension, filter, only, selectedIds, primaryId, onSelect, focus, placeMarker, pins, routeMode, routePoints, placing, onRouteClick, onRouteDrag, onError }: Props) {
   const mapRef = useRef<MapRef>(null)
   const [bbox, setBbox] = useState<Bbox | null>(null)
   const [zoom, setZoom] = useState(13)
@@ -158,10 +159,10 @@ export default function MapView({ routes, basemap, dimension, filter, only, sele
   // Tiles around the viewport are cached and loaded ahead of panning (see map/useMapData.ts).
   const { data, status } = useMapData(bbox, zoom, filter, dataVersion)
   useEffect(() => {
-    onStatus({ mock: status.mock, error: status.error, zoomedOut: false, loading: status.loading })
-    // onStatus is stable enough (setState wrapper in the parent); intentionally not a dependency.
+    onError(status.error)
+    // onError is a setState wrapper in the parent; intentionally not a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status.mock, status.error, status.loading])
+  }, [status.error])
 
   // Once the base style is loaded, learn where our layers go and style it for the current basemap.
   const onLoad = () => {

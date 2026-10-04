@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { Opinion, TimeOfDay } from '../api/types'
-import { DIMENSIONS, scoreColor } from '../lib/dimensions'
+import type { Opinion, TimeOfDay } from '../../api/types'
+import { DIMENSIONS, scoreColor } from '../../lib/dimensions'
 
 /** Mean of the rating's filled dimensions; null when the author gave none. */
 function ratingAverage(rating: Opinion['rating']): number | null {

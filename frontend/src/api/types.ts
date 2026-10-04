@@ -94,7 +94,7 @@ export type Comment = {
 /**
  * Comment extended with the author's own rating and votes, as shown in the opinions list.
  * NOT IN docs/CONTRACT.md YET: the contract's `Comment` has no rating link and there is no vote endpoint.
- * Needs a contract PR (B1 + FE) before the real backend can return it; until then it comes from mocks.
+ * Needs a contract PR (B1 + FE).
  */
 export type Opinion = Comment & {
   rating?: Rating | null

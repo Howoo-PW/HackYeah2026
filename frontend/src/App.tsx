@@ -5,21 +5,20 @@ import type { AssistantPoint, AssistantResponse, AssistantStreet, Place } from '
 import { useAuth } from './auth/useAuth'
 import { useMyOpinions } from './auth/useMyOpinions'
 import AccountButton from './auth/AccountButton'
-import AssistantPanel from './components/AssistantPanel'
-import FilterBar from './components/FilterBar'
-import BasemapSwitch from './components/BasemapSwitch'
-import Legend from './components/Legend'
-import MapView from './components/MapView'
-import type { Basemap } from './components/MapView'
-import PlaceCard from './components/PlaceCard'
-import RoutePanel from './components/RoutePanel'
-import SearchBox from './components/SearchBox'
-import SegmentPanel from './components/SegmentPanel'
+import AssistantPanel from './components/assistant/AssistantPanel'
+import FilterBar from './components/map/FilterBar'
+import BasemapSwitch from './components/map/BasemapSwitch'
+import Legend from './components/map/Legend'
+import MapView from './components/map/MapView'
+import type { Basemap } from './components/map/MapView'
+import PlaceCard from './components/search/PlaceCard'
+import RoutePanel from './components/route/RoutePanel'
+import SearchBox from './components/search/SearchBox'
+import SegmentPanel from './components/segment/SegmentPanel'
 import type { Metric } from './lib/dimensions'
-import { activePoint, useRouteDraft } from './routing/useRouteDraft'
-import { useRoutePlan } from './routing/useRoutePlan'
+import { activePoint, useRouteDraft } from './components/route/useRouteDraft'
+import { useRoutePlan } from './components/route/useRoutePlan'
 
-type Status = { mock: boolean; error: string | null; zoomedOut: boolean; loading: boolean }
 
 /**
  * Main screen, Google Maps style: full-screen map, search bar top-left (street search -> place card
@@ -55,7 +54,7 @@ export default function App() {
   const [groupIds, setGroupIds] = useState<number[]>([])
   // The whole street of the clicked piece (same name, joined end to end); the group above is only a stretch of it plus side streets.
   const [street, setStreet] = useState<{ forId: number; ids: number[] } | null>(null)
-  const [status, setStatus] = useState<Status>({ mock: false, error: null, zoomedOut: false, loading: false })
+  const [mapError, setMapError] = useState<string | null>(null)
   const [place, setPlace] = useState<Place | null>(null)
   const [focus, setFocus] = useState<{ place: Place } | null>(null)
   const [routing, setRouting] = useState(false)
@@ -193,7 +192,7 @@ export default function App() {
         placing={activePoint(route.draft) !== null}
         onRouteClick={route.clickMap}
         onRouteDrag={route.placeFromMap}
-        onStatus={setStatus}
+        onError={setMapError}
       />
 
       <div className="pointer-events-none absolute left-0 top-0 flex w-[calc(100%-6.5rem)] max-w-md flex-col gap-2 p-3 md:w-full">
@@ -262,9 +261,7 @@ export default function App() {
               />
             )}
 
-            {status.zoomedOut && <Notice>Przybliż mapę, żeby zobaczyć odcinki.</Notice>}
-            {status.error && <Notice tone="error">{status.error}</Notice>}
-            {status.mock && <Notice tone="warn">Backend niedostępny — dane przykładowe.</Notice>}
+            {mapError && <div className="pointer-events-auto self-start rounded-xl bg-red-100 px-3 py-1 text-sm text-red-800 shadow">{mapError}</div>}
           </>
         )}
       </div>
@@ -301,9 +298,4 @@ function Logo() {
       </span>
     </span>
   )
-}
-
-function Notice({ children, tone = 'info' }: { children: React.ReactNode; tone?: 'info' | 'warn' | 'error' }) {
-  const colors = { info: 'bg-white text-gray-700', warn: 'bg-amber-100 text-amber-900', error: 'bg-red-100 text-red-800' }
-  return <div className={`pointer-events-auto self-start rounded-xl px-3 py-1 text-sm shadow ${colors[tone]}`}>{children}</div>
 }

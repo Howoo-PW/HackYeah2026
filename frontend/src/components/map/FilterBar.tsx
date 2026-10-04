@@ -1,6 +1,6 @@
-import type { SegmentFilter } from '../api/client'
-import { METRICS, SCORE_COLORS } from '../lib/dimensions'
-import type { Metric } from '../lib/dimensions'
+import type { SegmentFilter } from '../../api/client'
+import { METRICS, SCORE_COLORS } from '../../lib/dimensions'
+import type { Metric } from '../../lib/dimensions'
 
 type Props = {
   dimension: Metric

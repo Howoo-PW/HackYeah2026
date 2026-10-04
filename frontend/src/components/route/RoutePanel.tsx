@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Dimension, Place, RouteProfile, RouteResult } from '../api/types'
-import { ROUTE_DIMENSIONS, scoreColor } from '../lib/dimensions'
-import { locateUser } from '../lib/geolocation'
-import { activePoint, buildRouteRequest, getPoint, MAX_STOPS } from '../routing/useRouteDraft'
-import type { PointKey, RouteDraftApi } from '../routing/useRouteDraft'
-import type { RoutePlanApi } from '../routing/useRoutePlan'
-import SearchBox from './SearchBox'
+import type { Dimension, Place, RouteProfile, RouteResult } from '../../api/types'
+import { ROUTE_DIMENSIONS, scoreColor } from '../../lib/dimensions'
+import { locateUser } from '../../lib/geolocation'
+import { activePoint, buildRouteRequest, getPoint, MAX_STOPS } from './useRouteDraft'
+import type { PointKey, RouteDraftApi } from './useRouteDraft'
+import type { RoutePlanApi } from './useRoutePlan'
+import SearchBox from '../search/SearchBox'
 
 const ICON_PROPS = { width: 28, height: 28, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinejoin: 'round', strokeLinecap: 'round' } as const
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { fetchNearestSegment } from '../api/client'
-import type { Place } from '../api/types'
+import { fetchNearestSegment } from '../../api/client'
+import type { Place } from '../../api/types'
 
 type Props = {
   place: Place

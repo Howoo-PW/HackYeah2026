@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
-import { searchPlaces, SearchError, suggestPlaces } from '../api/geocode'
-import type { Place } from '../api/types'
+import { searchPlaces, SearchError, suggestPlaces } from '../../api/geocode'
+import type { Place } from '../../api/types'
 
 type Props = {
   /** Text shown in the input at start (e.g. the name of an already chosen place). */

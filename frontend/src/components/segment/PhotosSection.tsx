@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { fetchPhotos } from '../api/client'
-import type { Photo } from '../api/types'
+import { fetchPhotos } from '../../api/client'
+import type { Photo } from '../../api/types'
 
 const PAGE_SIZE = 12
 

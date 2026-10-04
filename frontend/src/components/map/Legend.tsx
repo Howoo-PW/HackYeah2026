@@ -1,5 +1,5 @@
-import { METRICS, SCORE_COLORS } from '../lib/dimensions'
-import type { Metric } from '../lib/dimensions'
+import { METRICS, SCORE_COLORS } from '../../lib/dimensions'
+import type { Metric } from '../../lib/dimensions'
 
 /** Small always-visible color legend for the metric the map is colored by (bottom-left, desktop). */
 export default function Legend({ metric }: { metric: Metric }) {

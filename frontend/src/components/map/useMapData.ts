@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useReducer, useRef } from 'react'
-import { ApiRequestError, fetchGroupMap, fetchSegments } from '../api/client'
-import type { SegmentFilter } from '../api/client'
-import type { Bbox, MapCollection } from '../api/types'
-import { KRAKOW_BBOX } from '../lib/dimensions'
+import { ApiRequestError, fetchGroupMap, fetchSegments } from '../../api/client'
+import type { SegmentFilter } from '../../api/client'
+import type { Bbox, MapCollection } from '../../api/types'
+import { KRAKOW_BBOX } from '../../lib/dimensions'
 
 /**
  * From this zoom up the map loads segments (limit 2000 per response, contract 5.2). Below it the viewport is too big
@@ -20,10 +20,10 @@ const MAX_SPLIT_DEPTH = 3
 
 type MapFeature = MapCollection['features'][number]
 type Tile = { id: string; bbox: Bbox }
-type Entry = { state: 'loading' | 'done' | 'error'; features: MapFeature[]; mock: boolean; error: string | null }
+type Entry = { state: 'loading' | 'done' | 'error'; features: MapFeature[]; error: string | null }
 type Job = { tile: Tile; key: string; zoomedOut: boolean; filter: SegmentFilter }
 
-export type MapDataStatus = { mock: boolean; error: string | null; loading: boolean }
+type MapDataStatus = { error: string | null; loading: boolean }
 
 /** Tiles already requested or loaded, keyed by filter + tile. Shared by all maps, so remounting does not refetch. */
 const cache = new Map<string, Entry>()
@@ -67,10 +67,9 @@ function dedupe(features: MapFeature[]): MapFeature[] {
 }
 
 /** Segments of a box; a box with more than 2000 of them (422) is split in four and the halves merged. */
-async function loadSegments(box: Bbox, filter: SegmentFilter, depth = 0): Promise<{ features: MapFeature[]; mock: boolean }> {
+async function loadSegments(box: Bbox, filter: SegmentFilter, depth = 0): Promise<MapFeature[]> {
   try {
-    const { data, mock } = await fetchSegments(box, filter)
-    return { features: data.features as MapFeature[], mock }
+    return (await fetchSegments(box, filter)).features as MapFeature[]
   } catch (err) {
     if (!(err instanceof ApiRequestError) || err.status !== 422 || err.code !== 'VALIDATION_ERROR' || depth >= MAX_SPLIT_DEPTH) throw err
     const mx = (box[0] + box[2]) / 2
@@ -80,12 +79,12 @@ async function loadSegments(box: Bbox, filter: SegmentFilter, depth = 0): Promis
         loadSegments(b, filter, depth + 1),
       ),
     )
-    return { features: dedupe(parts.flatMap((p) => p.features)), mock: parts.some((p) => p.mock) }
+    return dedupe(parts.flat())
   }
 }
 
-async function loadJob(job: Job): Promise<{ features: MapFeature[]; mock: boolean }> {
-  if (job.zoomedOut) return { features: (await fetchGroupMap(job.tile.bbox, job.filter)).features as MapFeature[], mock: false }
+async function loadJob(job: Job): Promise<MapFeature[]> {
+  if (job.zoomedOut) return (await fetchGroupMap(job.tile.bbox, job.filter)).features as MapFeature[]
   return loadSegments(job.tile.bbox, job.filter)
 }
 
@@ -112,11 +111,11 @@ export function useMapData(bbox: Bbox | null, zoom: number, filter: SegmentFilte
       while (active.current < MAX_PARALLEL && queue.current.length > 0) {
         const job = queue.current.shift()!
         if (cache.get(job.key)?.state === 'loading') continue
-        cache.set(job.key, { state: 'loading', features: [], mock: false, error: null })
+        cache.set(job.key, { state: 'loading', features: [], error: null })
         active.current++
         loadJob(job)
-          .then((r) => cache.set(job.key, { state: 'done', features: r.features, mock: r.mock, error: null }))
-          .catch((err: Error) => cache.set(job.key, { state: 'error', features: [], mock: false, error: err.message }))
+          .then((features) => cache.set(job.key, { state: 'done', features, error: null }))
+          .catch((err: Error) => cache.set(job.key, { state: 'error', features: [], error: err.message }))
           .finally(() => {
             active.current--
             if (cache.size > MAX_ENTRIES) {
@@ -165,7 +164,6 @@ export function useMapData(bbox: Bbox | null, zoom: number, filter: SegmentFilte
   const status: MapDataStatus = {
     loading: plan !== null && viewEntries.some((e) => !e || e.state === 'loading'),
     error: viewEntries.find((e) => e?.state === 'error')?.error ?? null,
-    mock: loaded.some((t) => cache.get(entryKey(fKey, t))!.mock),
   }
   void tick // re-render when a tile finishes
   return { data: built ?? last.current, status, zoomedOut: plan?.zoomedOut ?? false }

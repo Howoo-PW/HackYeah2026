@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { MyOpinion } from '../api/types'
 import { DIMENSIONS, scoreColor } from '../lib/dimensions'
-import { Stars } from './OpinionCard'
+import { Stars } from '../components/segment/OpinionCard'
 
 type Road = { segmentId: number; name: string | null; date: string; rating: MyOpinion | null; comment: MyOpinion | null }
 
