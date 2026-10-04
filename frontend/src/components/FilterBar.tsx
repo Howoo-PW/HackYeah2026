@@ -10,16 +10,7 @@ type Props = {
   onClose: () => void
 }
 
-const ICONS: Record<Metric, string> = {
-  overall: '⭐',
-  surface: '🛣️',
-  views: '🌅',
-  safety: '🛡️',
-  traffic: '🚦',
-  parking: '🅿️',
-}
-
-/** Filters card (opened from the "Filtry" button under the search bar): dimension picker (what the map is colored by), legend, min-score filter and rated-only toggle. */
+/** Filters card (opened from the "Filtry" button under the search bar): dimension picker (what the map is colored by), legend and min-score filter. */
 export default function FilterBar({ dimension, onDimension, filter, onFilter, onClose }: Props) {
   const current = METRICS.find((d) => d.id === dimension)!
   const minScore = filter.minScore ?? 1
@@ -44,13 +35,10 @@ export default function FilterBar({ dimension, onDimension, filter, onFilter, on
                 role="tab"
                 aria-selected={active}
                 onClick={() => onDimension(d.id)}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
+                className={`rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
                   active ? 'bg-gray-900 text-white shadow' : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                <span className="text-lg leading-none" aria-hidden>
-                  {ICONS[d.id]}
-                </span>
                 {d.label}
               </button>
             )
@@ -95,15 +83,6 @@ export default function FilterBar({ dimension, onDimension, filter, onFilter, on
               <span className="w-8 rounded-md bg-gray-900 py-0.5 text-center text-xs font-bold text-white">≥ {minScore}</span>
             </div>
           </div>
-
-          <label className="flex cursor-pointer items-center justify-between">
-            <span>Tylko ocenione</span>
-            <Switch
-              checked={filter.ratedOnly}
-              onChange={(on) => onFilter({ ...filter, ratedOnly: on })}
-              label="Pokaż tylko ocenione odcinki"
-            />
-          </label>
 
           <label className="flex cursor-pointer items-center justify-between">
             <span>Bez przeszkód</span>

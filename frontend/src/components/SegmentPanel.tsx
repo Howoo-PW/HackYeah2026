@@ -67,7 +67,7 @@ export default function SegmentPanel({ segmentId, onGroup, onClose }: Props) {
       style={{ '--panel-w': `${width}px` } as React.CSSProperties}
     >
       <ResizeHandle width={width} onChange={setWidth} />
-      <aside className="max-h-[55vh] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl md:max-h-[calc(100dvh-4.5rem)] md:rounded-2xl">
+      <aside className="max-h-[55vh] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl md:max-h-[calc(100dvh-8.5rem)] md:rounded-2xl">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold leading-tight">{title ?? (detail ? 'Droga bez nazwy' : error ? 'Błąd' : 'Ładowanie…')}</h2>
