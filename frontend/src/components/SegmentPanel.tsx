@@ -3,7 +3,6 @@ import { fetchComments, fetchGroup, fetchSegmentDetail } from '../api/client'
 import type { GroupDetail, Opinion, Rating, Scores, SegmentDetail, Summary } from '../api/types'
 import { useAuth } from '../auth/useAuth'
 import { DIMENSIONS, overallScore, scoreColor, surfaceLabel } from '../lib/dimensions'
-import CommentForm from './CommentForm'
 import OpinionCard, { Stars } from './OpinionCard'
 import PhotosSection from './PhotosSection'
 import RatingForm from './RatingForm'
@@ -32,6 +31,8 @@ export default function SegmentPanel({ segmentId, onGroup, onClose }: Props) {
   const [saved, setSaved] = useState<{ userId: string | undefined; rating: Rating } | null>(null)
   const savedRating = saved && saved.userId === userId ? saved.rating : null
   const [reload, setReload] = useState(0)
+  // Bumped when a comment or photo was added with a rating: the lists below are remounted and read again.
+  const [contentVersion, setContentVersion] = useState(0)
 
   useEffect(() => {
     const ctrl = new AbortController()
@@ -113,9 +114,15 @@ export default function SegmentPanel({ segmentId, onGroup, onClose }: Props) {
           <RatingForm
             segmentId={segmentId}
             existing={savedRating ?? detail.my_rating}
+            existingComment={detail.my_comment ?? null}
+            existingPhoto={detail.my_photo ?? null}
             onSaved={(r) => {
               setSaved({ userId, rating: r })
               setReload((n) => n + 1)
+            }}
+            onContentAdded={() => {
+              setContentVersion((n) => n + 1)
+              setReload((n) => n + 1) // the detail carries the user's own comment and photo
             }}
           />
 
@@ -136,9 +143,9 @@ export default function SegmentPanel({ segmentId, onGroup, onClose }: Props) {
 
           <SummarySection summary={detail.summary} pending={detail.summary_pending === true} onRetry={() => setReload((n) => n + 1)} />
 
-          <PhotosSection segmentId={segmentId} />
+          <PhotosSection key={`photos-${contentVersion}`} segmentId={segmentId} />
 
-          <CommentsSection segmentId={segmentId} />
+          <CommentsSection key={`comments-${contentVersion}`} segmentId={segmentId} />
         </>
       )}
       </aside>
@@ -315,15 +322,8 @@ function CommentsSection({ segmentId }: { segmentId: number }) {
   return (
     <section className="mt-5 border-t border-gray-100 pt-4">
       <h3 className="text-sm font-semibold">Opinie{total !== null && ` (${total})`}</h3>
-      <CommentForm
-        segmentId={segmentId}
-        onPosted={(o) => {
-          setItems((prev) => [o, ...prev])
-          setTotal((t) => (t ?? 0) + 1)
-        }}
-      />
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      {total === 0 && <p className="mt-2 text-sm text-gray-500">Nikt jeszcze nie opisał tej drogi.</p>}
+      {total === 0 && <p className="mt-2 text-sm text-gray-500">Nikt jeszcze nie opisał tej drogi. Dodasz opinię, oceniając ją.</p>}
       <ul className="mt-1 divide-y divide-gray-100">
         {items.map((o) => (
           <OpinionCard key={o.id} opinion={o} />

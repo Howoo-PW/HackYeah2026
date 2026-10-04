@@ -281,4 +281,8 @@ class SegmentDetail(SegmentProperties):
     summary_pending: bool = False
     obstacles: list[Obstacle]
     photos_count: int
+    # The signed-in user's latest rating (any day), comment and visible photo of this road; a new opinion replaces them.
     my_rating: Rating | None
+    # Extensions (NOT IN docs/CONTRACT.md yet): the user's own comment and photo of this road.
+    my_comment: Comment | None = None
+    my_photo: Photo | None = None

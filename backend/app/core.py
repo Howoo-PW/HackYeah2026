@@ -76,8 +76,10 @@ def group(group_id: SegmentId, repo: RepositoryDep):
 @router.get("/segments/{segment_id}", response_model=SegmentDetail, tags=["segments"])
 def segment(segment_id: SegmentId, repo: RepositoryDep, user: Annotated[User | None, Depends(optional_user)],
             request: Request, background: BackgroundTasks):
-    """Return road details and today's rating for an optional signed-in user; starts a due AI summary in the background."""
+    """Return road details and the signed-in user's own rating, comment and photo; starts a due AI summary in the background."""
     detail = repo.segment(segment_id, user.id if user else None)
+    if detail.get("my_photo"):
+        detail["my_photo"] = photo_store.with_urls([detail["my_photo"]])[0]
     if detail["summary_pending"]:
         background.add_task(summaries.refresh, request.app.state.db_pool, segment_id)
     return detail
@@ -86,7 +88,7 @@ def segment(segment_id: SegmentId, repo: RepositoryDep, user: Annotated[User | N
 @router.post("/segments/{segment_id}/ratings", response_model=Rating, status_code=201, responses={200: {"model": Rating}}, tags=["ratings"])
 def rate(segment_id: SegmentId, payload: RatingCreate, user: UserDep,
          repo: RepositoryDep, request: Request, response: Response):
-    """Create or replace today's score under the 30-attempt hourly user limit."""
+    """Create the user's rating of this road or replace the previous one (any day) under the 30-attempt hourly user limit."""
     request.app.state.rate_limiter.check(str(user.id), "ratings", 30)
     result, created = repo.rate(segment_id, user.id, payload, datetime.now(timezone.utc))
     response.status_code = 201 if created else 200
@@ -110,6 +112,25 @@ def comment(segment_id: SegmentId, payload: CommentCreate, user: UserDep,
     if getattr(request.app.state, "db_pool", None) is not None:
         background.add_task(embeddings.index_comment, request.app.state.db_pool, created["id"])
     return created
+
+
+@router.put("/segments/{segment_id}/comments/mine", response_model=Comment, status_code=201, responses={200: {"model": Comment}}, tags=["comments"])
+def put_my_comment(segment_id: SegmentId, payload: CommentCreate, user: UserDep,
+                   repo: RepositoryDep, request: Request, background: BackgroundTasks, response: Response):
+    """Write the user's comment on this road, replacing the previous one (201 first / 200 replaced); re-embedded in the background."""
+    request.app.state.rate_limiter.check(str(user.id), "comments", 10)
+    result, created = repo.put_comment(segment_id, user.id, payload.text)
+    response.status_code = 201 if created else 200
+    if getattr(request.app.state, "db_pool", None) is not None:
+        background.add_task(embeddings.index_comment, request.app.state.db_pool, result["id"])
+    return result
+
+
+@router.delete("/segments/{segment_id}/comments/mine", status_code=204, tags=["comments"])
+def delete_my_comment(segment_id: SegmentId, user: UserDep, repo: RepositoryDep):
+    """Remove the user's own comment on this road."""
+    repo.delete_my_comments(segment_id, user.id)
+    return Response(status_code=204)
 
 
 @router.patch("/admin/comments/{comment_id}", response_model=Comment, tags=["admin"])
@@ -145,6 +166,15 @@ def add_photo(segment_id: SegmentId, user: UserDep, repo: RepositoryDep, request
         photo_store.remove([path, thumbnail_path])
         raise
     return photo_store.with_urls([row])[0]
+
+
+@router.delete("/segments/{segment_id}/photos/mine", status_code=204, tags=["photos"])
+def delete_my_photos(segment_id: SegmentId, user: UserDep, repo: RepositoryDep, keep: Annotated[UUID | None, Query()] = None):
+    """Remove the user's own photos on this road (all, or all except the new one given in `keep`), rows and stored files."""
+    paths = repo.delete_my_photos(segment_id, user.id, keep)
+    if paths:
+        photo_store.remove(paths)
+    return Response(status_code=204)
 
 
 @router.patch("/admin/photos/{photo_id}", response_model=Photo, tags=["admin"])
