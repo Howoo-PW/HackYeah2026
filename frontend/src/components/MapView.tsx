@@ -6,8 +6,9 @@ import type { LineLayerSpecification } from 'react-map-gl/maplibre'
 import { setWorkerUrl } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { fetchGroupMap, fetchSegments, OPINIONS_CHANGED } from '../api/client'
-import type { Bbox, LatLon, MapCollection, Place } from '../api/types'
+import { OPINIONS_CHANGED } from '../api/client'
+import { SEGMENT_ZOOM, useMapData } from '../map/useMapData'
+import type { Bbox, LatLon, Place } from '../api/types'
 import { KRAKOW_BBOX, KRAKOW_CENTER, NO_DATA_COLOR, SCORE_COLORS, metricScore } from '../lib/dimensions'
 import type { Metric } from '../lib/dimensions'
 import type { PointKey } from '../routing/useRouteDraft'
@@ -61,12 +62,6 @@ function applyBasemap(mapRef: MapRef, basemap: Basemap, original: Record<string,
     }
   }
 }
-/**
- * From this zoom up the map loads segments (limit 2000 per response, contract 5.2). Below it the viewport is too big
- * for that, so it loads fragments (GET /groups): the whole city is about 5 000, so any zoom works.
- */
-const SEGMENT_ZOOM = 15
-
 /** A planned route to draw; the selected alternative is emphasised and the map fits to it. */
 export type DrawnRoute = { coordinates: [number, number][]; selected: boolean }
 
@@ -136,7 +131,6 @@ export default function MapView({ routes, basemap, dimension, filter, only, sele
   const mapRef = useRef<MapRef>(null)
   const [bbox, setBbox] = useState<Bbox | null>(null)
   const [zoom, setZoom] = useState(13)
-  const [data, setData] = useState<MapCollection | null>(null)
   const [styleInfo, setStyleInfo] = useState<StyleInfo | null>(null)
   const originalVisibility = useRef<Record<string, string>>({})
 
@@ -156,33 +150,13 @@ export default function MapView({ routes, basemap, dimension, filter, only, sele
     return () => window.removeEventListener(OPINIONS_CHANGED, bump)
   }, [])
 
-  // Refetch on viewport/filter change; abort the previous request so stale responses never win.
+  // Tiles around the viewport are cached and loaded ahead of panning (see map/useMapData.ts).
+  const { data, status } = useMapData(bbox, zoom, filter, dataVersion)
   useEffect(() => {
-    if (!bbox) return
-    const ctrl = new AbortController()
-    onStatus({ mock: false, error: null, zoomedOut: false, loading: true })
-    const timer = setTimeout(() => {
-      const request: Promise<{ data: MapCollection; mock: boolean }> =
-        zoom < SEGMENT_ZOOM
-          ? fetchGroupMap(bbox, filter, ctrl.signal).then((data) => ({ data, mock: false }))
-          : fetchSegments(bbox, filter, ctrl.signal)
-      request
-        .then(({ data, mock }) => {
-          setData(data)
-          onStatus({ mock, error: null, zoomedOut: false, loading: false })
-        })
-        .catch((err: Error) => {
-          if (ctrl.signal.aborted) return
-          onStatus({ mock: false, error: err.message, zoomedOut: false, loading: false })
-        })
-    }, 250)
-    return () => {
-      clearTimeout(timer)
-      ctrl.abort()
-    }
+    onStatus({ mock: status.mock, error: status.error, zoomedOut: false, loading: status.loading })
     // onStatus is stable enough (setState wrapper in the parent); intentionally not a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bbox, zoom, filter, dataVersion])
+  }, [status.mock, status.error, status.loading])
 
   // Once the base style is loaded, learn where our layers go and style it for the current basemap.
   const onLoad = () => {
