@@ -49,8 +49,8 @@ class FakeGeo:
         self.known = {k.lower(): v for k, v in known.items()}
         self.asked = []
 
-    async def find(self, text):
-        self.asked.append(text)
+    async def find(self, text, area=False):
+        self.asked.append((text, area))
         return self.known.get(text.lower())
 
 
@@ -69,8 +69,8 @@ class FakeData:
         self.fact_calls.append(list(ids))
         return ["Ulica Dietla: nawierzchnia: dobra; oceniona przez wielu użytkowników.", "Komentarz użytkownika z 2026-09-28: „Nowy asfalt.”"]
 
-    def top_fragments(self, dimension, want, bbox, count):
-        self.bbox = bbox
+    def top_fragments(self, dimension, want, bbox, count, outline=None):
+        self.bbox, self.outline = bbox, outline
         return self.rows
 
 
@@ -194,8 +194,10 @@ def streets_plan(**kw):
 
 def test_streets_are_ranked_from_the_data_and_described():
     ai, data = FakeAi(streets_plan(area="Kazimierz")), FakeData(rows=[street_row(1), street_row(2, "Bulwarowa", 4.4)])
-    geo = FakeGeo({"Kazimierz": Found("Kazimierz", 50.05, 19.94, bbox=(19.93, 50.04, 19.96, 50.06))})
+    outline = {"type": "Polygon", "coordinates": [[[19.93, 50.04], [19.96, 50.04], [19.96, 50.06], [19.93, 50.04]]]}
+    geo = FakeGeo({"Kazimierz": Found("Kazimierz", 50.05, 19.94, bbox=(19.93, 50.04, 19.96, 50.06), outline=outline)})
     result = run("najładniejsze widoki na Kazimierzu", deps(ai, geo=geo, data=data))
+    assert geo.asked == [("Kazimierz", True)] and data.outline == outline  # the district's real shape, not just its box
     assert result.intent == "streets" and [s.name for s in result.streets] == ["Dietla", "Bulwarowa"]
     assert result.streets[0].segment_ids == [20, 21] and result.streets[0].score == pytest.approx(3.5)
     assert data.bbox == (19.93, 50.04, 19.96, 50.06)
@@ -318,6 +320,20 @@ def test_geocoder_reads_the_first_hit_and_caches_it(monkeypatch):
     assert (found.name, found.lat, found.bbox) == ("Wawel", 50.054, (19.93, 50.05, 19.94, 50.06))
     assert seen[0]["bounded"] == "1" and seen[0]["countrycodes"] == "pl" and seen[0]["viewbox"].startswith("19.792,50.126")
     assert asyncio.run(geo.find("  wawel ")) == found and len(seen) == 1  # same name: no second request
+
+
+def test_geocoder_returns_the_outline_of_an_area_only_when_asked(monkeypatch):
+    polygon = {"type": "Polygon", "coordinates": [[[19.93, 50.04], [19.96, 50.04], [19.96, 50.06], [19.93, 50.04]]]}
+    seen = []
+
+    def handler(request):
+        seen.append(dict(request.url.params))
+        return httpx.Response(200, json=[{"lat": "50.05", "lon": "19.94", "name": "Podgórze", "display_name": "Podgórze", "geojson": polygon}])
+
+    geo = nominatim(handler, monkeypatch)
+    assert asyncio.run(geo.find("Podgórze")).outline is None and "polygon_geojson" not in seen[0]
+    assert asyncio.run(geo.find("Podgórze", area=True)).outline == polygon and seen[1]["polygon_geojson"] == "1"
+    assert len(seen) == 2  # the two modes are cached separately
 
 
 def test_geocoder_remembers_misses_and_turns_failures_into_502(monkeypatch):

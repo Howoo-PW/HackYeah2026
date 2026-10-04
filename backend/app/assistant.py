@@ -231,14 +231,15 @@ async def do_place(plan: AiPlan, query: str, d: Deps) -> AssistantResponse:
 async def do_streets(plan: AiPlan, query: str, d: Deps) -> AssistantResponse:
     if plan.dimension is None:
         return clarify(plan, "Według jakiego kryterium mam szukać: nawierzchni, widoków, bezpieczeństwa czy ruchu? " + HINT)
-    bbox = None
+    bbox, outline = None, None
     if plan.area:
-        area = await d.geo.find(plan.area)
+        area = await d.geo.find(plan.area, area=True)
         if area is None:
             return clarify(plan, f"Nie znalazłem w Krakowie okolicy „{plan.area}”.")
         pad = 0.012
         bbox = area.bbox or (area.lon - pad, area.lat - pad * 0.7, area.lon + pad, area.lat + pad * 0.7)
-    rows = await run_in_threadpool(d.data.top_fragments, plan.dimension, plan.want, bbox, plan.count)
+        outline = area.outline  # the district's real shape when OpenStreetMap has one, else the box above
+    rows = await run_in_threadpool(d.data.top_fragments, plan.dimension, plan.want, bbox, plan.count, outline)
     where = f" w okolicy „{plan.area}”" if plan.area else ""
     if not rows:
         return clarify(plan, f"Nie mam jeszcze wystarczająco ocen, żeby wskazać takie ulice{where}.")

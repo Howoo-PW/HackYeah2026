@@ -42,6 +42,9 @@ export function useRoutePlan(draft: RouteDraft) {
     error: current?.error ?? null,
     selected: current?.selected ?? 0,
     run,
+    /** Shows routes computed elsewhere (the assistant) as the result for `draft`; they count while the draft stays as given. */
+    adopt: (draft: RouteDraft, routes: RouteResult[]) =>
+      setState({ key: JSON.stringify(buildRouteRequest(draft)), status: 'done', routes, error: null, selected: 0 }),
     select: (index: number) => setState((s) => (s ? { ...s, selected: index } : s)),
     /** Forget the result and cancel a running request (e.g. when leaving route mode). */
     clear: () => {

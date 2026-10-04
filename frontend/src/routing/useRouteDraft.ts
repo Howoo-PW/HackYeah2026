@@ -117,6 +117,14 @@ export function useRouteDraft() {
       const key = activePoint(draft)
       if (key !== null) placeFromMap(key, ll)
     },
+    /** Replaces the whole draft (e.g. with what the assistant understood); returns it so a result can be matched to it. */
+    load: (next: Pick<RouteDraft, 'a' | 'b' | 'stops' | 'profile' | 'weights'>): RouteDraft => {
+      lookup.current = {}
+      setError(null)
+      const draft: RouteDraft = { ...next, picking: null }
+      setDraft(draft)
+      return draft
+    },
     /** Starts a fresh route, optionally with the destination already chosen (e.g. from a search result). */
     start: (destination?: Place) => {
       lookup.current = {}

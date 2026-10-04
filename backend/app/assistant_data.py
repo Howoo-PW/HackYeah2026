@@ -3,6 +3,8 @@
 Uses the views the map already uses: segment_scores (effective scores per segment) and fragment_map (one row per fragment).
 """
 
+import json
+
 from . import assistant_facts as facts
 
 MAX_STREETS = 4  # streets described per answer, longest first
@@ -32,7 +34,9 @@ FROM public.fragment_map
 WHERE name IS NOT NULL AND {dim} IS NOT NULL AND ratings_count >= %(min)s{area}
 ORDER BY {dim} {order}, ratings_count DESC, group_id LIMIT %(n)s
 """
-AREA_SQL = " AND ST_Intersects(geom, ST_MakeEnvelope(%(w)s, %(s)s, %(e)s, %(n_)s, 4326))"
+AREA_SQL = " AND geom && ST_MakeEnvelope(%(w)s, %(s)s, %(e)s, %(n_)s, 4326)"
+# with the real outline of a district: a fragment counts when its representative point lies inside it
+OUTLINE_SQL = " AND ST_Contains(ST_SetSRID(ST_GeomFromGeoJSON(%(outline)s), 4326), ST_ClosestPoint(geom, ST_Centroid(geom)))"
 
 
 class AssistantData:
@@ -83,17 +87,22 @@ class AssistantData:
         lines += [facts.obstacle_fact(o["kind"], o["description"], o["valid_until"]) for o in obstacles]
         return lines
 
-    def top_fragments(self, dimension: str, want: str, bbox: tuple[float, float, float, float] | None, count: int) -> list[dict]:
-        """Fragments with the best (or worst) score for one dimension, optionally inside a box (west, south, east, north).
+    def top_fragments(self, dimension: str, want: str, bbox: tuple[float, float, float, float] | None, count: int,
+                      outline: dict | None = None) -> list[dict]:
+        """Fragments with the best (or worst) score for one dimension, optionally inside a box (west, south, east, north)
+        and, when `outline` (GeoJSON) is given, only those lying inside that area.
 
         Fragments rated by at least two people come first; when there are too few of them, those with a single rating fill up.
         """
         if dimension not in facts.DIMENSIONS:
             raise ValueError(dimension)
-        sql = RANK_SQL.format(dim=dimension, order="DESC" if want == "best" else "ASC", area=AREA_SQL if bbox else "")
+        area = (AREA_SQL if bbox else "") + (OUTLINE_SQL if outline else "")
+        sql = RANK_SQL.format(dim=dimension, order="DESC" if want == "best" else "ASC", area=area)
         params = {"n": count}
         if bbox:
             params |= {"w": bbox[0], "s": bbox[1], "e": bbox[2], "n_": bbox[3]}
+        if outline:
+            params["outline"] = json.dumps(outline)
         with self.pool.connection() as conn:
             rows = conn.execute(sql, {**params, "min": 2}).fetchall()
             if len(rows) < count:

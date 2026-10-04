@@ -86,6 +86,8 @@ type Props = {
   focus: { place: Place } | null
   /** Pin for the place found by the search (hidden in route mode, where the A/B pins are shown). */
   placeMarker: Place | null
+  /** Numbered pins (e.g. the streets the assistant found); shown outside route mode. */
+  pins: { lat: number; lon: number; label: string }[]
   /** Route mode: map clicks set the route points instead of selecting a segment. */
   routeMode: boolean
   routePoints: { a: LatLon | null; b: LatLon | null; stops: (LatLon | null)[] }
@@ -132,7 +134,7 @@ const ROUTE_PINS = [
 ] as const
 
 /** Map with segments colored by the chosen dimension; reports clicks as segment ids. */
-export default function MapView({ routes, basemap, dimension, filter, only, selectedIds, primaryId, onSelect, focus, placeMarker, routeMode, routePoints, placing, onRouteClick, onRouteDrag, onStatus }: Props) {
+export default function MapView({ routes, basemap, dimension, filter, only, selectedIds, primaryId, onSelect, focus, placeMarker, pins, routeMode, routePoints, placing, onRouteClick, onRouteDrag, onStatus }: Props) {
   const mapRef = useRef<MapRef>(null)
   const [bbox, setBbox] = useState<Bbox | null>(null)
   const [zoom, setZoom] = useState(13)
@@ -306,6 +308,12 @@ export default function MapView({ routes, basemap, dimension, filter, only, sele
     >
       <NavigationControl position="bottom-right" showCompass={false} />
       <GeolocateControl position="bottom-right" showAccuracyCircle={false} fitBoundsOptions={{ maxZoom: 16 }} />
+      {!routeMode &&
+        pins.map((pin) => (
+          <Marker key={`${pin.label}-${pin.lat}-${pin.lon}`} longitude={pin.lon} latitude={pin.lat} anchor="bottom">
+            <PinIcon label={pin.label} color="#6d28d9" />
+          </Marker>
+        ))}
       {!routeMode && placeMarker && (
         <Marker longitude={placeMarker.lon} latitude={placeMarker.lat} anchor="bottom">
           <PinIcon label="" color="#111827" />

@@ -56,14 +56,21 @@ const LEVELS = [
 /** Slider position for a weight; weight 1 (not offered here) shows as the middle step. */
 const positionOf = (weight: number) => (weight === 0 ? 0 : weight >= 3 ? 2 : 1)
 
-type Props = { route: RouteDraftApi; plan: RoutePlanApi; onBack: () => void }
+type Props = {
+  route: RouteDraftApi
+  plan: RoutePlanApi
+  /** The assistant's reply when this route came from it; shown above the points. */
+  note?: string | null
+  onDismissNote?: () => void
+  onBack: () => void
+}
 
 /**
  * Left panel in route mode (opened with "Trasa" on a place card): start, optional stops and destination
  * (searched by street name or picked on the map), travel profile and optional requirements for road quality.
  * "Wyznacz trasę" asks the backend (POST /route) and lists the alternatives; the selected one is drawn on the map.
  */
-export default function RoutePanel({ route, plan, onBack }: Props) {
+export default function RoutePanel({ route, plan, note, onDismissNote, onBack }: Props) {
   const { draft, error } = route
   const request = buildRouteRequest(draft)
   const active = activePoint(draft)
@@ -84,6 +91,22 @@ export default function RoutePanel({ route, plan, onBack }: Props) {
       </header>
 
       <div className="p-3">
+        {note && (
+          <div className="mb-3 rounded-xl border border-violet-100 bg-violet-50/60 p-3">
+            <div className="flex items-start justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-violet-900">
+                <span className="rounded bg-violet-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">AI</span>
+                Asystent
+              </p>
+              {onDismissNote && (
+                <button onClick={onDismissNote} aria-label="Ukryj odpowiedź asystenta" className="rounded-full px-1.5 text-gray-500 hover:bg-violet-100">
+                  ✕
+                </button>
+              )}
+            </div>
+            <p className="mt-1.5 whitespace-pre-line text-sm text-gray-900">{note}</p>
+          </div>
+        )}
         <div className="space-y-1.5">
           <PointRow label="A" placeholder="Wybierz punkt początkowy" color="bg-emerald-600" pointKey="a" route={route} active={active === 'a'} />
 
@@ -164,7 +187,7 @@ export default function RoutePanel({ route, plan, onBack }: Props) {
           {plan.status === 'loading' ? 'Szukam trasy…' : 'Wyznacz trasę'}
         </button>
 
-        <RouteResults plan={plan} />
+        <RouteResults plan={plan} scrollToResults={!note} />
       </div>
     </section>
   )
@@ -309,11 +332,12 @@ function formatDistance(meters: number): string {
 }
 
 /** Loading / error / the routes. Picking a card selects the route drawn on the map. */
-function RouteResults({ plan }: { plan: RoutePlanApi }) {
+/** `scrollToResults` is off when the assistant's note is shown, so that the note at the top stays in view. */
+function RouteResults({ plan, scrollToResults }: { plan: RoutePlanApi; scrollToResults: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (plan.status === 'done') ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  }, [plan.status])
+    if (scrollToResults && plan.status === 'done') ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [plan.status, scrollToResults])
 
   if (plan.status === 'idle') return null
   if (plan.status === 'loading') return <p className="mt-3 text-sm text-gray-700">Szukam najlepszej trasy…</p>

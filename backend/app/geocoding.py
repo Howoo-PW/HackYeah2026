@@ -30,11 +30,12 @@ class Found:
     lat: float
     lon: float
     bbox: tuple[float, float, float, float] | None = None
+    outline: dict | None = None  # GeoJSON Polygon/MultiPolygon of a district or other area (only when asked for)
 
 
 class Geocoder(Protocol):
-    async def find(self, text: str) -> Found | None:
-        """The best match for `text` inside Krakow, or None."""
+    async def find(self, text: str, area: bool = False) -> Found | None:
+        """The best match for `text` inside Krakow, or None. With `area`, a district's real outline comes along when it has one."""
 
 
 def _key(text: str) -> str:
@@ -51,8 +52,8 @@ class NominatimGeocoder:
         self._gate = asyncio.Lock()
         self._last_call = 0.0
 
-    async def find(self, text: str) -> Found | None:
-        key = _key(text)
+    async def find(self, text: str, area: bool = False) -> Found | None:
+        key = _key(text) + ("|area" if area else "")
         cached = self._cache.get(key)
         if cached and cached[0] > time.monotonic():
             return cached[1]
@@ -61,6 +62,7 @@ class NominatimGeocoder:
         params = {
             "q": text, "format": "jsonv2", "limit": "1", "countrycodes": "pl", "accept-language": "pl",
             "viewbox": f"{west},{north},{east},{south}", "bounded": "1",
+            **({"polygon_geojson": "1"} if area else {}),
         }
         async with self._gate:
             wait = self._last_call + MIN_INTERVAL_S - time.monotonic()
@@ -84,6 +86,7 @@ class NominatimGeocoder:
                 name=top.get("name") or top.get("display_name", text).split(",")[0],
                 lat=float(top["lat"]), lon=float(top["lon"]),
                 bbox=(float(box[2]), float(box[0]), float(box[3]), float(box[1])) if box else None,
+                outline=top["geojson"] if area and (top.get("geojson") or {}).get("type") in ("Polygon", "MultiPolygon") else None,
             )
         self._cache[key] = (time.monotonic() + (HIT_TTL_S if found else MISS_TTL_S), found)
         return found

@@ -20,6 +20,10 @@ Zmiany wspólnego kontraktu w osobnym PR.
 
 ## Stan
 
+- 2026-10-04, feature/ai-assistant: asystent trasy/miejsca z opisu (docs/ASSISTANT.md). `POST /assistant/plan` (opis → plan: route/place/streets, profil, wagi 0–3)
+  i `POST /assistant/answer` (fakty z bazy → 2–5 zdań); `assistant_schemas.py`, `assistant_mock.py` (reguły dla MOCK_AI), `llm.py` (`plan`, `answer`).
+  Bez pętli narzędzi: backend wykonuje plan, model tylko czyta i pisze. 18 testów (`tests/test_assistant.py`).
+
 - 2026-10-04, backend/ai-integration: podsumowanie ocen i opinii działa na prawdziwym LLM. Backend (`app/summaries.py`)
   przy `GET /segments/{id}` uruchamia w tle odświeżenie, gdy kliknięty odcinek ma >=5 własnych widocznych komentarzy albo choć jedno widoczne zdjęcie (samo zdjęcie wystarcza; /summarize przyjmuje wtedy `comments: []`) i brak cache albo >=5 nowych;
   wysyła do AI 50 najnowszych komentarzy z oceną autora oraz średnie oceny odcinka (pola opcjonalne `scores`, `ratings_count`,

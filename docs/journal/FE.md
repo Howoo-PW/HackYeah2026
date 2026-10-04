@@ -4,6 +4,21 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+## 2026-10-04 — Beata — gałąź `feature/ai-assistant`
+
+**Zadanie:** wyszukiwarka tras i miejsc z opisu słowami, z agentem AI, który korzysta z ocen, komentarzy i danych (docs/ASSISTANT.md).
+
+**Zrobione:**
+- Serwis AI: `POST /assistant/plan` (opis → plan route/place/streets, profil, wagi 0–3) i `POST /assistant/answer` (fakty → odpowiedź); tryb mock z regułami; prompty z osobnymi wskazówkami dla trasy, miejsca i ulic.
+- Backend: `POST /api/v1/assistant` (10/min na IP). Potok bez pętli narzędzi: plan z AI → geokodowanie Nominatim (cache, 1 zapytanie/s, obrys dzielnicy) → trasa z własnego grafu / miejsce / ranking fragmentów → fakty słowami (oceny, komentarze, podsumowania, przeszkody) → odpowiedź AI. Błąd AI przy odpowiedzi: pokazujemy fakty (`model: fallback`).
+- Frontend: przycisk „Asystent AI”, `AssistantPanel`; trasa trafia do planera (`route.load` + `plan.adopt`, notatka asystenta w `RoutePanel`), miejsce na kartę miejsca, ulice jako numerowane pinezki z podświetleniem.
+- Testy: AI 43, backend 332 (w tym 41 asystenta); SQL sprawdzony na bazie (tylko odczyty); test w przeglądarce: trasa, ulice, miejsce, prośba spoza zakresu.
+
+**Dalej / blokery:**
+- Kontrakt: `POST /assistant` i `/assistant/*` serwisu AI do dopisania do `docs/CONTRACT.md` osobnym PR (na razie opis w docs/ASSISTANT.md).
+- Opóźnienie 5–12 s (dwa wywołania modelu + geokodowanie + trasa); streaming odpowiedzi skróciłby czekanie.
+- „Moja lokalizacja” w opisie nie jest obsługiwana; punkt startu trzeba podać.
+
 ## 2026-10-04 — Beata — gałąź `frontend/routing`
 
 **Zadanie:** sprawdzić uruchomienie w Dockerze; widok wyboru trasy A→B z opcjami (sam wybór, bez routera i bez przekazywania danych).
