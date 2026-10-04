@@ -8,7 +8,7 @@ export const DIMENSIONS: { id: Dimension; label: string; low: string; high: stri
   { id: 'surface', label: 'Nawierzchnia', low: 'dziury, zniszczona', high: 'gładka, nowa' },
   { id: 'views', label: 'Widoki', low: 'nic ciekawego', high: 'piękne widoki' },
   { id: 'safety', label: 'Bezpieczeństwo', low: 'niebezpiecznie', high: 'bezpiecznie' },
-  { id: 'traffic', label: 'Obciążenie', low: 'korki, problemy', high: 'płynnie' },
+  { id: 'traffic', label: 'Ruch', low: 'duży', high: 'mały' },
   { id: 'parking', label: 'Parkingi', low: 'brak miejsc', high: 'łatwo zaparkować' },
 ]
 
@@ -19,7 +19,7 @@ export const DIMENSIONS: { id: Dimension; label: string; low: string; high: stri
 export const ROUTE_DIMENSIONS = DIMENSIONS.filter((d) => d.id !== 'parking')
 
 /** 1 = worst, 5 = best everywhere (contract section 3). */
-export const SCORE_COLORS = ['#d7191c', '#fdae61', '#ffdf4d', '#a6d96a', '#1a9641']
+export const SCORE_COLORS = ['#ff0000', '#ff8c00', '#ffe600', '#80e000', '#00c800']
 export const NO_DATA_COLOR = '#9ca3af'
 
 export function dimensionLabel(id: Dimension): string {
@@ -59,4 +59,33 @@ export function metricScore(scores: Scores, metric: Metric): number | null {
 export function inKrakow(lat: number, lon: number): boolean {
   const [minLon, minLat, maxLon, maxLat] = KRAKOW_BBOX
   return lon >= minLon && lon <= maxLon && lat >= minLat && lat <= maxLat
+}
+
+/** Polish names for the OSM `surface` values present in our data; unknown values are shown as they are. */
+const OSM_SURFACES: Record<string, string> = {
+  asphalt: 'asfalt',
+  paved: 'utwardzona',
+  concrete: 'beton',
+  'concrete:plates': 'płyty betonowe',
+  paving_stones: 'kostka brukowa',
+  sett: 'kostka granitowa',
+  cobblestone: 'bruk',
+  grass_paver: 'płyty ażurowe',
+  unpaved: 'nieutwardzona',
+  compacted: 'ubita',
+  gravel: 'żwir',
+  fine_gravel: 'drobny żwir',
+  pebblestone: 'otoczaki',
+  ground: 'grunt',
+  dirt: 'ziemia',
+  grass: 'trawa',
+  mud: 'błoto',
+  sand: 'piasek',
+  wood: 'drewno',
+  rock: 'skała',
+}
+
+/** Surface of a road as shown in the details panel, in Polish ("brak danych" when OSM has none). */
+export function surfaceLabel(surface: string | null): string {
+  return surface ? (OSM_SURFACES[surface] ?? surface) : 'brak danych'
 }

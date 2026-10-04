@@ -118,6 +118,8 @@ export type SegmentDetail = SegmentProperties & {
   last_rating_at: string | null
   scores_by_time_of_day: Record<TimeOfDay, Scores>
   summary: Summary | null
+  /** An AI summary is due and being prepared in the background (NOT IN docs/CONTRACT.md yet). */
+  summary_pending?: boolean
   obstacles: Obstacle[]
   photos_count: number
   my_rating: Rating | null
@@ -200,4 +202,33 @@ export type RouteResult = {
   /** Share (0-1) of the route length that lies on rated segments. */
   coverage: number
   segment_ids: number[]
+}
+
+/** One of the signed-in user's own ratings or comments (GET /me/opinions). NOT IN docs/CONTRACT.md YET: needs a contract PR. */
+export type MyOpinion = {
+  kind: 'rating' | 'comment'
+  id: string
+  segment_id: number
+  segment_name: string | null
+  /** Fragment (group) the road belongs to; the zoomed-out map draws fragments. */
+  group_id: number | null
+  created_at: string
+  time_of_day: TimeOfDay | null
+  surface: number | null
+  views: number | null
+  safety: number | null
+  traffic: number | null
+  parking: number | null
+  text: string | null
+  status: ContentStatus | null
+}
+
+/** A segment photo (contract 5.7): signed URLs valid for one hour. */
+export type Photo = {
+  id: string
+  segment_id: number
+  url: string
+  thumbnail_url: string
+  taken_at: string | null
+  created_at: string
 }

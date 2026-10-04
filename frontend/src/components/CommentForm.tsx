@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { ApiRequestError, postComment } from '../api/client'
 import type { Opinion } from '../api/types'
-import { displayNameOf } from '../auth/authContext'
 import { useAuth } from '../auth/useAuth'
 
 const MAX_LENGTH = 1000 // contract: comment text 1–1000 characters
@@ -33,7 +32,7 @@ export default function CommentForm({ segmentId, onPosted }: { segmentId: number
     setBusy(true)
     setError(null)
     try {
-      const created = await postComment(segmentId, trimmed, { id: user.id, display_name: displayNameOf(user) })
+      const created = await postComment(segmentId, trimmed)
       onPosted(created)
       setText('')
     } catch (err) {

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Layer, Map, Marker, NavigationControl, Source } from 'react-map-gl/maplibre'
+import { GeolocateControl, Layer, Map, Marker, NavigationControl, Source } from 'react-map-gl/maplibre'
 import type { ExpressionSpecification, LayerSpecification } from 'maplibre-gl'
 import type { MapLayerMouseEvent, MapRef, ViewStateChangeEvent } from 'react-map-gl/maplibre'
 import type { LineLayerSpecification } from 'react-map-gl/maplibre'
 import { setWorkerUrl } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { fetchGroupMap, fetchSegments } from '../api/client'
+import { fetchGroupMap, fetchSegments, OPINIONS_CHANGED } from '../api/client'
 import type { Bbox, LatLon, MapCollection, Place } from '../api/types'
 import { KRAKOW_BBOX, KRAKOW_CENTER, NO_DATA_COLOR, SCORE_COLORS, metricScore } from '../lib/dimensions'
 import type { Metric } from '../lib/dimensions'
@@ -25,7 +25,7 @@ const SATELLITE_TILES = 'https://server.arcgisonline.com/ArcGIS/rest/services/Wo
 const SATELLITE_ATTRIBUTION = 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
 
 /** Layers we add ourselves; never touched when restyling the base map. */
-const OWN_LAYERS = new Set(['segments', 'segments-casing', 'segment-selected', 'segment-selected-inner', 'satellite', 'routes-casing', 'routes-line'])
+const OWN_LAYERS = new Set(['segments', 'segments-casing', 'segment-selected', 'segment-selected-inner', 'segment-primary', 'segment-primary-inner', 'satellite', 'routes-casing', 'routes-line'])
 
 type StyleInfo = {
   /** Bottom-most layer of the base style: the satellite raster goes below it. */
@@ -75,8 +75,12 @@ type Props = {
   basemap: Basemap
   dimension: Metric
   filter: SegmentFilter
-  /** Segments to highlight: the whole street stretch of the clicked piece. */
+  /** When set, only these roads (zoomed in) and the fragments containing them (zoomed out) are drawn. */
+  only: { segmentIds: Set<number>; groupIds: Set<number> } | null
+  /** Segments to highlight: the street stretch of the clicked piece (only the pieces with the clicked street's name, not side streets). */
   selectedIds: number[]
+  /** The clicked piece itself: outlined in another color inside the highlighted stretch. */
+  primaryId: number | null
   onSelect: (id: number | null) => void
   /** Fly/fit the map to this place whenever the object changes (a new object per search result). */
   focus: { place: Place } | null
@@ -128,7 +132,7 @@ const ROUTE_PINS = [
 ] as const
 
 /** Map with segments colored by the chosen dimension; reports clicks as segment ids. */
-export default function MapView({ routes, basemap, dimension, filter, selectedIds, onSelect, focus, placeMarker, routeMode, routePoints, placing, onRouteClick, onRouteDrag, onStatus }: Props) {
+export default function MapView({ routes, basemap, dimension, filter, only, selectedIds, primaryId, onSelect, focus, placeMarker, routeMode, routePoints, placing, onRouteClick, onRouteDrag, onStatus }: Props) {
   const mapRef = useRef<MapRef>(null)
   const [bbox, setBbox] = useState<Bbox | null>(null)
   const [zoom, setZoom] = useState(13)
@@ -142,6 +146,14 @@ export default function MapView({ routes, basemap, dimension, filter, selectedId
     const b = map.getBounds()
     setBbox([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()])
     setZoom(map.getZoom())
+  }, [])
+
+  // A saved rating changes the scores: refetch the viewport.
+  const [dataVersion, setDataVersion] = useState(0)
+  useEffect(() => {
+    const bump = () => setDataVersion((v) => v + 1)
+    window.addEventListener(OPINIONS_CHANGED, bump)
+    return () => window.removeEventListener(OPINIONS_CHANGED, bump)
   }, [])
 
   // Refetch on viewport/filter change; abort the previous request so stale responses never win.
@@ -170,7 +182,7 @@ export default function MapView({ routes, basemap, dimension, filter, selectedId
     }
     // onStatus is stable enough (setState wrapper in the parent); intentionally not a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bbox, zoom, filter])
+  }, [bbox, zoom, filter, dataVersion])
 
   // Once the base style is loaded, learn where our layers go and style it for the current basemap.
   const onLoad = () => {
@@ -187,14 +199,20 @@ export default function MapView({ routes, basemap, dimension, filter, selectedId
   // Flatten the chosen dimension into a single `score` property so the paint expression stays simple.
   const colored = useMemo(() => {
     if (!data) return null
+    const features = only
+      ? data.features.filter((f) => {
+          const id = (f.properties as { id?: number }).id
+          return id !== undefined && (f.properties.kind === 'group' ? only.groupIds : only.segmentIds).has(id)
+        })
+      : data.features
     return {
       ...data,
-      features: data.features.map((f) => ({
+      features: features.map((f) => ({
         ...f,
         properties: { ...f.properties, score: metricScore(f.properties.scores, dimension) },
       })),
     }
-  }, [data, dimension])
+  }, [data, dimension, only])
 
   // Move the map to a searched place; leave room for the left panels on desktop.
   useEffect(() => {
@@ -237,11 +255,27 @@ export default function MapView({ routes, basemap, dimension, filter, selectedId
     [routes],
   )
 
-  // only segments (not the coarse fragments shown when zoomed out) can be selected
+  // The loaded stretch also contains side streets joined to it (a stretch is a group of connected roads), so the highlight keeps only the
+  // pieces with the clicked street's name. Only segments (not the coarse fragments shown when zoomed out) can be selected.
+  const primaryName = useMemo(() => {
+    const hit = data?.features.find((f) => (f.properties as { id?: number }).id === primaryId)
+    return (hit?.properties as { name?: string | null } | undefined)?.name ?? null
+  }, [data, primaryId])
   const selectedFilter = useMemo(
-    () => ['all', ['!=', ['get', 'kind'], 'group'], ['in', ['get', 'id'], ['literal', selectedIds]]] as ExpressionSpecification,
-    [selectedIds],
+    () =>
+      [
+        'all',
+        ['!=', ['get', 'kind'], 'group'],
+        ['in', ['get', 'id'], ['literal', selectedIds]],
+        ...(primaryName ? [['==', ['get', 'name'], primaryName]] : []),
+      ] as ExpressionSpecification,
+    [selectedIds, primaryName],
   )
+  const primaryFilter = useMemo(
+    () => ['all', ['!=', ['get', 'kind'], 'group'], ['==', ['get', 'id'], primaryId ?? -1]] as ExpressionSpecification,
+    [primaryId],
+  )
+
 
   const onClick = (e: MapLayerMouseEvent) => {
     if (routeMode) {
@@ -271,6 +305,7 @@ export default function MapView({ routes, basemap, dimension, filter, selectedId
       cursor={routeMode && placing ? 'crosshair' : 'auto'}
     >
       <NavigationControl position="bottom-right" showCompass={false} />
+      <GeolocateControl position="bottom-right" showAccuracyCircle={false} fitBoundsOptions={{ maxZoom: 16 }} />
       {!routeMode && placeMarker && (
         <Marker longitude={placeMarker.lon} latitude={placeMarker.lat} anchor="bottom">
           <PinIcon label="" color="#111827" />
@@ -329,6 +364,23 @@ export default function MapView({ routes, basemap, dimension, filter, selectedId
             type="line"
             beforeId={styleInfo.labelId}
             filter={selectedFilter}
+            layout={segmentsLayout}
+            paint={{ 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3.5, 13, 6.5, 17, 14] }}
+          />
+          {/* The clicked piece: an orange outline over the blue stretch, so it stands out inside it. */}
+          <Layer
+            id="segment-primary"
+            type="line"
+            beforeId={styleInfo.labelId}
+            filter={primaryFilter}
+            layout={segmentsLayout}
+            paint={{ 'line-color': '#f59e0b', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 7, 13, 12, 17, 26] }}
+          />
+          <Layer
+            id="segment-primary-inner"
+            type="line"
+            beforeId={styleInfo.labelId}
+            filter={primaryFilter}
             layout={segmentsLayout}
             paint={{ 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3.5, 13, 6.5, 17, 14] }}
           />

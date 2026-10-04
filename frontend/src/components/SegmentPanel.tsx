@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fetchComments, fetchGroup, fetchSegmentDetail } from '../api/client'
 import type { GroupDetail, Opinion, Rating, Scores, SegmentDetail, Summary } from '../api/types'
 import { useAuth } from '../auth/useAuth'
-import { DIMENSIONS, overallScore, scoreColor } from '../lib/dimensions'
+import { DIMENSIONS, overallScore, scoreColor, surfaceLabel } from '../lib/dimensions'
 import CommentForm from './CommentForm'
 import OpinionCard, { Stars } from './OpinionCard'
+import PhotosSection from './PhotosSection'
 import RatingForm from './RatingForm'
 
 type Props = {
@@ -67,7 +68,7 @@ export default function SegmentPanel({ segmentId, onGroup, onClose }: Props) {
       style={{ '--panel-w': `${width}px` } as React.CSSProperties}
     >
       <ResizeHandle width={width} onChange={setWidth} />
-      <aside className="max-h-[55vh] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl md:max-h-[calc(100dvh-8.5rem)] md:rounded-2xl">
+      <aside className="max-h-[55vh] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl md:max-h-[calc(100dvh-8rem)] md:rounded-2xl">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold leading-tight">{title ?? (detail ? 'Droga bez nazwy' : error ? 'Błąd' : 'Ładowanie…')}</h2>
@@ -119,8 +120,8 @@ export default function SegmentPanel({ segmentId, onGroup, onClose }: Props) {
           />
 
           <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-1 text-sm text-gray-600">
-            <dt>Nawierzchnia (OSM)</dt>
-            <dd>{detail.surface_osm ?? 'brak danych'}</dd>
+            <dt>Nawierzchnia</dt>
+            <dd>{surfaceLabel(detail.surface_osm)}</dd>
             <dt>Limit prędkości</dt>
             <dd>{detail.maxspeed ? `${detail.maxspeed} km/h` : 'brak danych'}</dd>
             <dt>Oświetlenie</dt>
@@ -133,7 +134,9 @@ export default function SegmentPanel({ segmentId, onGroup, onClose }: Props) {
             </p>
           )}
 
-          <SummarySection summary={detail.summary} />
+          <SummarySection summary={detail.summary} pending={detail.summary_pending === true} onRetry={() => setReload((n) => n + 1)} />
+
+          <PhotosSection segmentId={segmentId} />
 
           <CommentsSection segmentId={segmentId} />
         </>
@@ -230,7 +233,18 @@ function OverallScore({ scores, ratingsCount }: { scores: Scores; ratingsCount: 
 const CONFIDENCE_LABEL = { low: 'niska pewność', medium: 'średnia pewność', high: 'wysoka pewność' } as const
 
 /** AI-generated summary of opinions. Contract: `summary` is null when there are too few comments. */
-function SummarySection({ summary }: { summary: Summary | null }) {
+function SummarySection({ summary, pending, onRetry }: { summary: Summary | null; pending: boolean; onRetry: () => void }) {
+  // The backend writes the summary a few seconds after the first request: look again until it is there (at most 5 times).
+  const tries = useRef(0)
+  useEffect(() => {
+    if (!pending || tries.current >= 5) return
+    const timer = setTimeout(() => {
+      tries.current += 1
+      onRetry()
+    }, 5000)
+    return () => clearTimeout(timer)
+  }, [pending, onRetry])
+
   return (
     <section className="mt-5 rounded-xl border border-violet-100 bg-violet-50/60 p-3">
       <div className="flex items-center justify-between">
@@ -243,13 +257,17 @@ function SummarySection({ summary }: { summary: Summary | null }) {
         {summary && <span className="text-[11px] text-violet-700">{CONFIDENCE_LABEL[summary.confidence]}</span>}
       </div>
 
-      {!summary && <p className="mt-2 text-sm text-gray-500">Za mało opinii, żeby przygotować podsumowanie.</p>}
+      {!summary && (
+        <p className="mt-2 text-sm text-gray-500">
+          {pending ? 'Przygotowuję podsumowanie…' : 'Za mało opinii i zdjęć, żeby przygotować podsumowanie.'}
+        </p>
+      )}
 
       {summary && (
         <>
           <p className="mt-2 text-sm font-medium text-gray-900">{summary.overall}</p>
           <dl className="mt-2 space-y-1 text-sm text-gray-700">
-            {DIMENSIONS.map((d) => (
+            {DIMENSIONS.filter((d) => summary[d.id].trim().replace(/[.!\s]+$/, '').toLowerCase() !== 'brak informacji').map((d) => (
               <div key={d.id}>
                 <dt className="inline font-semibold">{d.label}: </dt>
                 <dd className="inline">{summary[d.id]}</dd>
@@ -258,13 +276,13 @@ function SummarySection({ summary }: { summary: Summary | null }) {
           </dl>
           {summary.conflicts.length > 0 && (
             <ul className="mt-2 space-y-1 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
-              {summary.conflicts.map((c) => (
+              {summary.conflicts.slice(0, 2).map((c) => (
                 <li key={c}>⚠ {c}</li>
               ))}
             </ul>
           )}
           <p className="mt-2 text-[11px] text-gray-400">
-            Wygenerowane automatycznie na podstawie {summary.comments_count} opinii.
+            Wygenerowane automatycznie na podstawie {summary.comments_count > 0 ? `${summary.comments_count} opinii i zdjęć` : 'zdjęć'}.
           </p>
         </>
       )}
