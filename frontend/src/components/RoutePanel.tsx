@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Dimension, Place, RouteProfile, RouteResult } from '../api/types'
 import { ROUTE_DIMENSIONS, scoreColor } from '../lib/dimensions'
+import { locateUser } from '../lib/geolocation'
 import { activePoint, buildRouteRequest, getPoint, MAX_STOPS } from '../routing/useRouteDraft'
 import type { PointKey, RouteDraftApi } from '../routing/useRouteDraft'
 import type { RoutePlanApi } from '../routing/useRoutePlan'
@@ -220,23 +221,16 @@ function PointRow({ label, placeholder, color, pointKey, route, active, onRemove
   const [locating, setLocating] = useState(false)
   const place = getPoint(route.draft, pointKey)
 
-  const useMyLocation = () => {
-    if (!navigator.geolocation) {
-      route.setError('Ta przeglądarka nie udostępnia lokalizacji.')
-      return
-    }
+  const useMyLocation = async () => {
     setLocating(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocating(false)
-        route.place(pointKey, { lat: pos.coords.latitude, lon: pos.coords.longitude, name: 'Moja lokalizacja', detail: null, bounds: null })
-      },
-      () => {
-        setLocating(false)
-        route.setError('Nie udało się pobrać lokalizacji. Sprawdź zgodę w przeglądarce.')
-      },
-      { enableHighAccuracy: true, timeout: 10000 },
-    )
+    try {
+      const { lat, lon } = await locateUser()
+      route.place(pointKey, { lat, lon, name: 'Moja lokalizacja', detail: null, bounds: null })
+    } catch (err) {
+      route.setError(err instanceof Error ? err.message : 'Nie udało się pobrać lokalizacji.')
+    } finally {
+      setLocating(false)
+    }
   }
 
   return (
