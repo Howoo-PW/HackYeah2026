@@ -123,6 +123,9 @@ export type SegmentDetail = SegmentProperties & {
   obstacles: Obstacle[]
   photos_count: number
   my_rating: Rating | null
+  /** The signed-in user's own comment and photo of this road (NOT IN docs/CONTRACT.md yet); a new opinion replaces them. */
+  my_comment?: Opinion | null
+  my_photo?: Photo | null
 }
 
 export type SegmentCollection = FeatureCollection<LineString, SegmentProperties>

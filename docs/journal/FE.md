@@ -4,6 +4,23 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+## 2026-10-04 — Beata — gałąź `feature/rating-with-comment-photo`
+
+**Zadanie:** komentarz i zdjęcie mają iść razem z oceną (wcześniej dodawane osobno).
+
+**Zrobione:**
+- Jeden formularz „Twoja opinia” (`RatingForm`): gwiazdki, pora dnia, komentarz (opcjonalnie, do 1000 znaków) i zdjęcie (opcjonalnie, z podglądem) i jeden przycisk „Zapisz opinię”. Wysyłka po kolei: ocena, komentarz, zdjęcie; przy błędzie w połowie zapisane kroki zostają, a ponowienie powtarza tylko brakujące (komunikat mówi, co się nie udało).
+- Usunięty osobny `CommentForm`; `PhotosSection` pokazuje tylko galerię (dodawanie przez ocenę); po dodaniu komentarza lub zdjęcia listy w panelu odświeżają się. Kompresja zdjęcia przeniesiona do `lib/image.ts`.
+- Jedna opinia na użytkownika i odcinek (pełna podmiana): `POST /ratings` zastępuje ostatnią ocenę z dowolnego dnia (201 pierwsza / 200 zastąpiona; starsze oceny użytkownika na odcinku są usuwane); nowe `PUT /segments/{id}/comments/mine` (zastępuje komentarz, 201/200), `DELETE .../comments/mine`, `DELETE .../photos/mine[?keep=<id>]` (wiersze i pliki w storage). `GET /segments/{id}` zwraca `my_rating` (ostatnia, nie tylko dzisiejsza), `my_comment` i `my_photo`. Nowy komentarz jest indeksowany ponownie (embedding).
+- Formularz wykrywa istniejącą opinię: „Zmień swoją opinię”, wypełnione gwiazdki i komentarz, miniatura zdjęcia z „Zmień” / ✕; „Zapisz zmiany” podmienia ocenę, tekst i zdjęcie (pusty komentarz usuwa stary).
+- Po odświeżeniu strony przycisk dalej pokazuje „Zmień swoją opinię”: `fetchSegmentDetail` wysyła teraz token zalogowanego (wcześniej szedł anonimowo, więc `my_rating`/`my_comment`/`my_photo` wracały puste); przy 401 (wygasły token) szczegóły wczytują się anonimowo.
+- Testy: backend 343 (4 nowe, offline); SQL nowych metod sprawdzony na bazie online w transakcji z wycofaniem (nic nie zostało w bazie).
+
+**Dalej / blokery:**
+- Nowe endpointy i pola `my_comment`/`my_photo` oraz zmiana „jedna ocena na użytkownika i odcinek” wymagają wpisu w `docs/CONTRACT.md` w osobnym PR (oznaczone w schematach jako NOT IN CONTRACT). Unikalność w bazie `(user, segment, rated_on)` bez zmian: dopilnowuje jej backend.
+- To nadal kilka żądań, nie jedna transakcja: przy awarii sieci po ocenie komentarz lub zdjęcie mogą się nie zmienić (użytkownik może ponowić).
+- Nie sprawdzone w przeglądarce z prawdziwym logowaniem.
+
 ## 2026-10-04 — Beata — gałąź `feature/ai-assistant` (poprawki asystenta, seed Wisły)
 
 **Zrobione:**

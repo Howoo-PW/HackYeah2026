@@ -213,7 +213,7 @@ class Repository:
         return row
 
     def segment(self, segment_id: int, user_id: UUID | None = None):
-        """Read detail, live scores, visible content and today's own rating."""
+        """Read detail, live scores, visible content and the signed-in user's own rating, comment and photo of this road."""
         row = self.conn.execute(SEGMENT_SELECT + " WHERE s.id = %s", (segment_id,)).fetchone()
         if row is None:
             raise AppError(404, "NOT_FOUND", "Nie znaleziono odcinka")
@@ -237,11 +237,18 @@ class Repository:
             ORDER BY created_at DESC, id DESC
         """, (segment_id,)).fetchall()
         row["photos_count"] = self.conn.execute("SELECT count(*)::int AS count FROM public.segment_photos WHERE segment_id = %s AND status = 'visible'", (segment_id,)).fetchone()["count"]
-        row["my_rating"] = None
+        row["my_rating"] = row["my_comment"] = row["my_photo"] = None
         if user_id:
+            # One opinion per user and road (a new one replaces the old): the user's latest rating, comment and visible photo.
             row["my_rating"] = self.conn.execute(
-                f"SELECT {RATING_COLUMNS} FROM public.ratings WHERE segment_id = %s AND user_id = %s AND rated_on = (now() AT TIME ZONE 'Europe/Warsaw')::date",
+                f"SELECT {RATING_COLUMNS} FROM public.ratings WHERE segment_id = %s AND user_id = %s ORDER BY rated_on DESC, created_at DESC LIMIT 1",
                 (segment_id, user_id),
+            ).fetchone()
+            row["my_comment"] = self.conn.execute(
+                COMMENT_SELECT + " WHERE c.segment_id = %s AND c.user_id = %s ORDER BY c.created_at DESC, c.id DESC LIMIT 1", (segment_id, user_id)
+            ).fetchone()
+            row["my_photo"] = self.conn.execute(
+                PHOTO_SELECT + " WHERE segment_id = %s AND user_id = %s AND status = 'visible' ORDER BY created_at DESC, id DESC LIMIT 1", (segment_id, user_id)
             ).fetchone()
         return row
 
@@ -259,12 +266,12 @@ class Repository:
         """, {"u": user_id, "n": limit}).fetchall()
 
     def rate(self, segment_id: int, user_id: UUID, payload: RatingCreate, now: datetime):
-        """Atomically replace the same user's daily rating and report 201 or 200."""
+        """Atomically replace the same user's rating of this road (whichever day it was made) and report 201 (first) or 200 (replaced)."""
         self.require_segment(segment_id)
         local_date = now.astimezone(ZoneInfo("Europe/Warsaw")).date()
         # Serialize same-user/segment writes, including the first INSERT.
         self.conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s), %s)", (str(user_id), segment_id))
-        previous = self.conn.execute("SELECT id FROM public.ratings WHERE user_id = %s AND segment_id = %s AND rated_on = %s", (user_id, segment_id, local_date)).fetchone()
+        previous = self.conn.execute("SELECT id FROM public.ratings WHERE user_id = %s AND segment_id = %s LIMIT 1", (user_id, segment_id)).fetchone()
         row = self.conn.execute(f"""
             INSERT INTO public.ratings (user_id, segment_id, rated_on, surface, views, safety, traffic, parking, time_of_day, created_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -275,6 +282,8 @@ class Repository:
             RETURNING {RATING_COLUMNS}
         """, (user_id, segment_id, local_date, *(getattr(payload, key) for key in DIMENSIONS),
                 (payload.time_of_day or time_of_day(now)).value, now)).fetchone()
+        # One opinion per user and road: ratings from other days are replaced by this one.
+        self.conn.execute("DELETE FROM public.ratings WHERE user_id = %s AND segment_id = %s AND id <> %s", (user_id, segment_id, row["id"]))
         return row, previous is None
 
     def comments(self, segment_id: int, page: int, page_size: int):
@@ -289,6 +298,44 @@ class Repository:
         self.require_segment(segment_id)
         row = self.conn.execute("INSERT INTO public.comments (segment_id, user_id, text) VALUES (%s, %s, %s) RETURNING id", (segment_id, user_id, text)).fetchone()
         return self.conn.execute(COMMENT_SELECT + " WHERE c.id = %s", (row["id"],)).fetchone()
+
+    def put_comment(self, segment_id: int, user_id: UUID, text: str):
+        """Replace the user's comment on this road with `text` (or write the first one); returns the comment and whether it is new.
+
+        Older comments of the same user on the road are removed, so there is one comment per user and road. A comment hidden by
+        a moderator stays hidden after an edit.
+        """
+        self.require_segment(segment_id)
+        self.conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s), %s)", (str(user_id), segment_id))
+        current = self.conn.execute("SELECT id FROM public.comments WHERE segment_id = %s AND user_id = %s ORDER BY created_at DESC, id DESC LIMIT 1", (segment_id, user_id)).fetchone()
+        if current is None:
+            current = self.conn.execute("INSERT INTO public.comments (segment_id, user_id, text) VALUES (%s, %s, %s) RETURNING id", (segment_id, user_id, text)).fetchone()
+            created = True
+        else:
+            self.conn.execute("UPDATE public.comments SET text = %s, created_at = now() WHERE id = %s", (text, current["id"]))
+            self.conn.execute("DELETE FROM public.comments WHERE segment_id = %s AND user_id = %s AND id <> %s", (segment_id, user_id, current["id"]))
+            created = False
+        summaries.invalidate(self.conn, segment_id)  # the cached summary may quote the old text
+        return self.conn.execute(COMMENT_SELECT + " WHERE c.id = %s", (current["id"],)).fetchone(), created
+
+    def delete_my_comments(self, segment_id: int, user_id: UUID) -> int:
+        """Remove the user's comments on this road (their vectors go with them); returns how many were removed."""
+        self.require_segment(segment_id)
+        removed = self.conn.execute("DELETE FROM public.comments WHERE segment_id = %s AND user_id = %s", (segment_id, user_id)).rowcount
+        if removed:
+            summaries.invalidate(self.conn, segment_id)
+        return removed
+
+    def delete_my_photos(self, segment_id: int, user_id: UUID, keep: UUID | None = None) -> list[str]:
+        """Remove the user's photos on this road except `keep`; returns the storage paths the router must delete."""
+        self.require_segment(segment_id)
+        rows = self.conn.execute(
+            "DELETE FROM public.segment_photos WHERE segment_id = %s AND user_id = %s AND (%s::uuid IS NULL OR id <> %s::uuid) RETURNING storage_path, thumbnail_path",
+            (segment_id, user_id, keep, keep),
+        ).fetchall()
+        if rows:
+            summaries.invalidate(self.conn, segment_id)
+        return [path for row in rows for path in (row["storage_path"], row["thumbnail_path"])]
 
     def photos(self, segment_id: int, page: int, page_size: int):
         """Visible photos of a road, newest first, as raw rows (storage paths still in place)."""

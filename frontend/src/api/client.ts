@@ -21,10 +21,13 @@ export class ApiRequestError extends Error {
   }
 }
 
-async function request<T>(path: string, signal?: AbortSignal, post?: unknown): Promise<T> {
+/** Sends a request; with `auth` the signed-in user's token goes along (when there is one), so the answer can include "my ..." fields. */
+async function request<T>(path: string, signal?: AbortSignal, post?: unknown, auth = false): Promise<T> {
+  const authorization = auth ? await optionalAuthHeader() : {}
   const res = await fetch(`${API_URL}${path}`, {
     signal,
-    ...(post !== undefined && { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(post) }),
+    headers: { ...authorization, ...(post !== undefined && { 'Content-Type': 'application/json' }) },
+    ...(post !== undefined && { method: 'POST', body: JSON.stringify(post) }),
   })
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as ApiError | null
@@ -78,11 +81,20 @@ export async function fetchGroupMap(bbox: Bbox, filter: SegmentFilter, signal?: 
   return request<GroupMapCollection>(`/groups?${params}`, signal)
 }
 
-/** GET /segments/{id}. Same mock fallback as {@link fetchSegments}. */
+/**
+ * GET /segments/{id}. Same mock fallback as {@link fetchSegments}. Sent with the user's token when signed in, so the road
+ * comes back with the user's own rating, comment and photo (`my_rating`, `my_comment`, `my_photo`), also after a page reload.
+ */
 export async function fetchSegmentDetail(id: number, signal?: AbortSignal): Promise<SegmentDetail> {
   if (!FORCE_MOCKS) {
     try {
-      return await request<SegmentDetail>(`/segments/${id}`, signal)
+      try {
+        return await request<SegmentDetail>(`/segments/${id}`, signal, undefined, true)
+      } catch (err) {
+        // A stale token must not hide the road: read it as a visitor (without "my ..." fields).
+        if (err instanceof ApiRequestError && err.status === 401) return await request<SegmentDetail>(`/segments/${id}`, signal)
+        throw err
+      }
     } catch (err) {
       if (signal?.aborted) throw err
       if (err instanceof ApiRequestError && err.status < 500) throw err
@@ -144,6 +156,12 @@ async function authHeader(): Promise<Record<string, string>> {
   return { Authorization: `Bearer ${data.session.access_token}` }
 }
 
+/** Like {@link authHeader}, but anonymous visitors simply get no header (public reads work for everybody). */
+async function optionalAuthHeader(): Promise<Record<string, string>> {
+  const { data } = (await supabase?.auth.getSession()) ?? { data: { session: null } }
+  return data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {}
+}
+
 /** Sends an authenticated write (JSON or multipart) and returns the parsed response. */
 async function write<T>(path: string, body: BodyInit, json: boolean, method = 'POST'): Promise<T> {
   const headers = { ...(await authHeader()), ...(json && { 'Content-Type': 'application/json' }) }
@@ -161,7 +179,7 @@ async function write<T>(path: string, body: BodyInit, json: boolean, method = 'P
   return res.json() as Promise<T>
 }
 
-/** POST /segments/{id}/ratings: creates today's rating or replaces it (201 new / 200 replaced). Only filled dimensions are sent. */
+/** POST /segments/{id}/ratings: creates the user's rating of the road or replaces the previous one, whichever day (201 new / 200 replaced). Only filled dimensions are sent. */
 export async function postRating(segmentId: number, input: RatingInput): Promise<Rating> {
   const body = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== null && v !== undefined))
   return write<Rating>(`/segments/${segmentId}/ratings`, JSON.stringify(body), true)
@@ -170,6 +188,37 @@ export async function postRating(segmentId: number, input: RatingInput): Promise
 /** POST /segments/{id}/comments: the comment comes back with the author's latest rating of the road, when there is one. */
 export async function postComment(segmentId: number, text: string): Promise<Opinion> {
   return write<Opinion>(`/segments/${segmentId}/comments`, JSON.stringify({ text }), true)
+}
+
+/** PUT /segments/{id}/comments/mine: writes the user's comment on the road, replacing the previous one (NOT IN docs/CONTRACT.md yet). */
+export async function putMyComment(segmentId: number, text: string): Promise<Opinion> {
+  return write<Opinion>(`/segments/${segmentId}/comments/mine`, JSON.stringify({ text }), true, 'PUT')
+}
+
+/** Sends an authenticated DELETE that answers 204 (no body). */
+async function remove(path: string): Promise<void> {
+  const headers = await authHeader()
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}${path}`, { method: 'DELETE', headers })
+  } catch {
+    throw new ApiRequestError(0, 'NETWORK', 'Brak połączenia z serwerem.')
+  }
+  if (!res.ok) {
+    const err = (await res.json().catch(() => null)) as ApiError | null
+    throw new ApiRequestError(res.status, err?.error.code ?? 'INTERNAL_ERROR', err?.error.message ?? res.statusText, err?.error.details ?? null)
+  }
+  window.dispatchEvent(new Event(OPINIONS_CHANGED))
+}
+
+/** DELETE /segments/{id}/comments/mine: removes the user's own comment on the road (NOT IN docs/CONTRACT.md yet). */
+export async function deleteMyComment(segmentId: number): Promise<void> {
+  return remove(`/segments/${segmentId}/comments/mine`)
+}
+
+/** DELETE /segments/{id}/photos/mine: removes the user's own photos on the road, except `keepId` (the new one); NOT IN docs/CONTRACT.md yet. */
+export async function deleteMyPhotos(segmentId: number, keepId?: string): Promise<void> {
+  return remove(`/segments/${segmentId}/photos/mine${keepId ? `?keep=${encodeURIComponent(keepId)}` : ''}`)
 }
 
 /** GET /segments/{id}/photos: visible photos with signed URLs, newest first. */

@@ -31,6 +31,8 @@ class FakeRepository:
     def __init__(self):
         self.rating = None
         self.owner = None
+        self.comment_text = None
+        self.kept_photo = None
 
     def segments(self, *args):
         return {"type": "FeatureCollection", "features": []}
@@ -49,6 +51,20 @@ class FakeRepository:
         self.owner = user_id
         return {"id": uuid4(), "segment_id": segment_id, "text": text, "status": "visible",
                 "created_at": NOW, "author": {"id": user_id, "display_name": "Test"}}
+
+    def put_comment(self, segment_id, user_id, text):
+        created = self.comment_text is None
+        self.comment_text, self.owner = text, user_id
+        return {"id": uuid4(), "segment_id": segment_id, "text": text, "status": "visible",
+                "created_at": NOW, "author": {"id": user_id, "display_name": "Test"}}, created
+
+    def delete_my_comments(self, segment_id, user_id):
+        self.comment_text, self.owner = None, user_id
+        return 1
+
+    def delete_my_photos(self, segment_id, user_id, keep=None):
+        self.kept_photo, self.owner = keep, user_id
+        return ["a/full.jpg", "a/thumb.jpg"]
 
     def comments(self, segment_id, page, page_size):
         return {"items": [], "page": page, "page_size": page_size, "total": 0}
@@ -243,3 +259,38 @@ def test_openapi_has_core_routes(client):
     spec = client.get("/openapi.json").json()
     assert "200" in spec["paths"]["/api/v1/segments/{segment_id}/ratings"]["post"]["responses"]
     assert spec["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"
+
+
+# ---- one opinion per user and road: a new comment or photo replaces the old one ---------------------------------------
+
+def test_own_comment_requires_login(client):
+    assert client.put("/api/v1/segments/1/comments/mine", json={"text": "x"}).status_code == 401
+    assert client.delete("/api/v1/segments/1/comments/mine").status_code == 401
+    assert client.delete("/api/v1/segments/1/photos/mine").status_code == 401
+
+
+def test_putting_a_comment_creates_then_replaces_it(client):
+    login()
+    first = client.put("/api/v1/segments/1/comments/mine", json={"text": "Pierwszy"})
+    second = client.put("/api/v1/segments/1/comments/mine", json={"text": "Poprawiony"})
+    assert (first.status_code, second.status_code) == (201, 200)
+    assert second.json()["text"] == "Poprawiony" and client.repo.owner == USER.id  # the author is the verified user
+
+
+def test_putting_an_empty_or_too_long_comment_is_rejected(client):
+    login()
+    for text in ("", "x" * 1001):
+        assert client.put("/api/v1/segments/1/comments/mine", json={"text": text}).status_code == 422
+
+
+def test_deleting_own_comment_and_photos(client, monkeypatch):
+    from app import photos as photo_store
+
+    removed = []
+    monkeypatch.setattr(photo_store, "remove", lambda paths: removed.append(paths))
+    login()
+    assert client.delete("/api/v1/segments/1/comments/mine").status_code == 204
+    keep = uuid4()
+    assert client.delete(f"/api/v1/segments/1/photos/mine?keep={keep}").status_code == 204
+    assert client.repo.kept_photo == keep and removed == [["a/full.jpg", "a/thumb.jpg"]]  # the stored files go with the rows
+    assert client.delete("/api/v1/segments/1/photos/mine?keep=not-a-uuid").status_code == 422
