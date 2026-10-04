@@ -67,6 +67,18 @@ function applyBasemap(mapRef: MapRef, basemap: Basemap, original: Record<string,
  */
 const SEGMENT_ZOOM = 15
 
+/** Click tolerance around the pointer, in screen pixels (fingers and thin lines at mid zoom need more than the line width). */
+const HIT_RADIUS = 14
+
+/** Distance in px from point (px, py) to the screen segment a-b. */
+function distToSegment(px: number, py: number, a: { x: number; y: number }, b: { x: number; y: number }): number {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const len2 = dx * dx + dy * dy
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / len2))
+  return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy))
+}
+
 /** A planned route to draw; the selected alternative is emphasised and the map fits to it. */
 export type DrawnRoute = { coordinates: [number, number][]; selected: boolean }
 
@@ -277,12 +289,43 @@ export default function MapView({ routes, basemap, dimension, filter, only, sele
   )
 
 
+  /** Roads are thin lines, so the click is matched within HIT_RADIUS px: the rendered feature closest to the pointer wins. */
+  const nearestFeature = (e: MapLayerMouseEvent) => {
+    const map = mapRef.current?.getMap()
+    if (!map || !map.getLayer('segments')) return e.features?.[0]
+    const { x, y } = e.point
+    const found = map.queryRenderedFeatures(
+      [
+        [x - HIT_RADIUS, y - HIT_RADIUS],
+        [x + HIT_RADIUS, y + HIT_RADIUS],
+      ],
+      { layers: ['segments'] },
+    )
+    let best = e.features?.[0]
+    let bestDist = best ? 0 : Infinity
+    for (const f of found) {
+      const g = f.geometry
+      const lines = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : []
+      for (const line of lines) {
+        const pts = line.map(([lon, lat]) => map.project([lon, lat]))
+        for (let i = 1; i < pts.length; i++) {
+          const d = distToSegment(x, y, pts[i - 1], pts[i])
+          if (d < bestDist) {
+            bestDist = d
+            best = f
+          }
+        }
+      }
+    }
+    return best
+  }
+
   const onClick = (e: MapLayerMouseEvent) => {
     if (routeMode) {
       onRouteClick({ lat: e.lngLat.lat, lon: e.lngLat.lng })
       return
     }
-    const feature = e.features?.[0]
+    const feature = nearestFeature(e)
     if (feature?.properties?.kind === 'group') {
       mapRef.current?.flyTo({ center: [e.lngLat.lng, e.lngLat.lat], zoom: SEGMENT_ZOOM + 1, duration: 600 })
       return
