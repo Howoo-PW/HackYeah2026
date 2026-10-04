@@ -172,10 +172,17 @@ def test_empty_path_is_not_found():
     assert (err.value.status, err.value.code) == (404, "NOT_FOUND")
 
 
-def test_graph_refuses_a_walking_profile():
+def test_graph_refuses_an_unknown_profile():
     with pytest.raises(AppError) as err:
-        graph_routes(FakeGraph(FAST), "foot-walking", Point(**RYNEK), Point(**PODGORZE), Weights())
+        graph_routes(FakeGraph(FAST), "flying-carpet", Point(**RYNEK), Point(**PODGORZE), Weights())
     assert err.value.status == 422
+
+
+@pytest.mark.parametrize("profile", ["driving-car", "cycling-regular", "foot-walking"])
+def test_every_profile_is_served_from_the_graph(profile):
+    graph = FakeGraph(FAST)
+    routes = graph_routes(graph, profile, Point(**RYNEK), Point(**PODGORZE), Weights())
+    assert len(routes) == 1 and graph.calls[0][0] == profile
 
 
 # --- endpoint --------------------------------------------------------------------------------------------------
@@ -231,42 +238,47 @@ def test_too_many_via_stops_are_rejected():
     assert res.status_code == 422 and res.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
-def test_pedestrian_route_goes_through_the_via_stops():
+def test_pedestrian_route_with_via_is_built_from_legs_like_the_other_profiles():
+    graph = use(FakeGraph(SCENIC, FAST))
     res = client.post("/api/v1/route", json={**FRONTEND_REQUEST, "profile": "foot-walking"})
     assert res.status_code == 200
-    routes = res.json()["routes"]
-    assert len(routes) == 1  # a route with stops is a single route
-    assert [19.93070285958069, 50.06549504004241] in routes[0]["geometry"]["coordinates"]
+    assert [r["rank"] for r in res.json()["routes"]] == [1, 2]  # same behaviour as cars and bikes
+    profile, legs, variants = graph.calls[0]
+    assert profile == "foot-walking" and len(legs) == 2
 
 
-def test_endpoint_serves_bikes_from_the_graph_too():
+@pytest.mark.parametrize("profile", ["driving-car", "cycling-regular", "foot-walking"])
+def test_endpoint_serves_every_profile_from_the_graph(profile):
     graph = use(FakeGraph(FAST))
-    assert route(profile="cycling-regular").status_code == 200
-    assert graph.calls[0][0] == "cycling-regular"
+    assert route(profile=profile).status_code == 200
+    assert graph.calls[0][0] == profile
 
 
-def test_pedestrians_do_not_touch_the_graph():
-    graph = use(FakeGraph(FAST))
-    res = route(profile="foot-walking")
-    assert res.status_code == 200 and graph.calls == []
-    assert len(res.json()["routes"]) == 3  # mock provider's alternatives
-
-
-def test_pedestrians_work_without_a_database():
-    assert route(profile="foot-walking").status_code == 200  # no graph override, no pool
-
-
-def test_cars_without_database_configuration_get_a_clean_error():
-    res = route()  # default dependency: the application has no pool in tests
+@pytest.mark.parametrize("profile", ["driving-car", "cycling-regular", "foot-walking"])
+def test_without_database_configuration_every_profile_gets_a_clean_error(profile):
+    res = route(profile=profile)  # default dependency: the application has no pool in tests
     assert res.status_code == 500
     assert res.json()["error"]["code"] == "INTERNAL_ERROR"
 
 
-def test_outside_krakow_is_rejected_before_the_graph_is_used():
+@pytest.mark.parametrize("field", ["from", "to"])
+def test_point_outside_the_service_area_is_rejected_before_the_graph_is_used(field):
     graph = use(FakeGraph(FAST))
-    res = route(**{"to": {"lat": 52.23, "lon": 21.01}})
+    res = route(**{field: {"lat": 52.23, "lon": 21.01}})  # Warsaw
     assert res.status_code == 422 and res.json()["error"]["code"] == "OUT_OF_AREA"
+    assert res.json()["error"]["details"]["field"] == field
     assert graph.calls == []
+
+
+def test_weight_above_three_is_rejected():
+    use(FakeGraph(FAST))
+    res = route({"surface": 4})
+    assert res.status_code == 422 and res.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_unknown_profile_is_rejected():
+    use(FakeGraph(FAST))
+    assert route(profile="flying-carpet").status_code == 422
 
 
 def test_route_limit_is_30_per_minute_per_ip():
@@ -387,5 +399,4 @@ class HealthConnection:
 )
 def test_routing_health_requires_a_built_graph(monkeypatch, pool, expected):
     monkeypatch.setattr(app.state, "db_pool", pool, raising=False)
-    monkeypatch.setattr(main.settings, "routing_provider", "mock")
     assert main._check_routing() == expected

@@ -1,9 +1,8 @@
-"""Own routing graph (Supabase pgRouting, docs/ROUTING_GRAPH.md): routes for cars and bikes that follow the
-priorities the user picked (weights 0-3 for surface, views, safety, traffic, parking).
+"""Own routing graph (Supabase pgRouting, docs/ROUTING_GRAPH.md): routes for cars, bikes and pedestrians that
+follow the priorities the user picked (weights 0-3 for surface, views, safety, traffic, parking).
 
 The database does the search (`public.find_route`); this module snaps the points, asks for the
 user's route and for the fastest one, and turns the edges into the `POST /route` response.
-Pedestrians stay with the external engine (see router.py).
 """
 
 from collections.abc import Sequence
@@ -16,7 +15,7 @@ from ..errors import AppError
 from .schemas import DIMENSIONS, Point, Profile, RouteOut, Scores, Weights
 from .scoring import overall_score
 
-GRAPH_PROFILES: tuple[str, ...] = ("driving-car", "cycling-regular")
+GRAPH_PROFILES: tuple[str, ...] = ("driving-car", "cycling-regular", "foot-walking")
 MAX_SNAP_M = 600.0  # a point farther than this from a road of the profile is refused (Old Town squares are ~500 m)
 
 
@@ -159,7 +158,7 @@ def build_route(steps: list[EdgeStep], weights: Weights) -> RouteOut:
 
 def graph_routes(source: GraphSource, profile: Profile, start: Point, end: Point, weights: Weights,
                  via: Sequence[Point] = ()) -> list[RouteOut]:
-    """Routes for a car or bike profile from the own graph, from `start` through the `via` stops (in order) to `end`.
+    """Routes for a car, bike or foot profile from the own graph, from `start` through the `via` stops (in order) to `end`.
 
     Without weights: the fastest route only. With weights: rank 1 is the best route for those priorities and
     rank 2 the fastest one (when it differs), so the user sees what the better route costs in time.

@@ -20,10 +20,6 @@ class Settings(BaseSettings):
     supabase_service_role_key: SecretStr = SecretStr("")
     supabase_db_url: SecretStr = SecretStr("")
     redis_url: SecretStr = SecretStr("redis://localhost:16379/0")
-    routing_provider: str = "ors"
-    ors_api_key: SecretStr = SecretStr("")
-    ors_base_url: str = "https://api.openrouteservice.org"
-    user_agent: str = "RateMyRoad/0.1 (hackathon project)"
 
     @property
     def cors_origin_list(self) -> list[str]:

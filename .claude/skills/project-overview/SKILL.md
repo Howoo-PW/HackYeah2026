@@ -52,11 +52,11 @@ Stan opisuje bieżący branch; nie oznaczaj cudzych zmian jako scalonych.
   1 akceptacja, checki backend/ai/frontend i zakaz force-push/usunięcia (także admin).
 
 - 2026-10-05: własny graf tras (db/routing-graph, w main) i POST /route dla auta i roweru na grafie
-  (backend/graph-routing). Piesi nadal przez ORS/mock.
+  (backend/graph-routing). Piesi też z grafu, po drogach (db/foot-network, backend/foot-routing); ORS i mock usunięte.
 
 ## TODO
 
-- Piesi: graf pieszy (B2 dane, backend), potem usunięcie mocka; przeszkody/pora dnia w koszcie;
+- Przeszkody i pora dnia w koszcie grafu; piesi faza 2 (ścieżki w parkach) tylko w razie potrzeby;
   frontend/routing: wybór A→B, suwaki wag, lokalizacja użytkownika jako start (FE); instrukcja
   podłączenia dla FE jest w skillu frontend, sekcja „Trasy: co podłączyć”.
 - backend/b1-howoo: sekrety DB/service_role i test rzeczywistego JWT/zapisów odroczone

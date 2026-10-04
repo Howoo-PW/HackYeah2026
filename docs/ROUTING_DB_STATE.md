@@ -2,7 +2,7 @@
 
 Dla B2 (graf) i AI (funkcja kosztu). Dopełnia propozycję własnego routera po ocenach (pgRouting).
 Stan bazy: 2026-10-04, projekt `lsfpirkqdtjkcaujnsde`. Zakres: **`driving-car` i `cycling-regular`**.
-Dla `foot-walking` `POST /route` zostaje przy ORS (jest w `backend/routing`), kontrakt się nie zmienia.
+(Aktualizacja: piesi, `foot-walking`, też są już w grafie, po drogach, zamiast ORS; patrz `docs/ROUTING_GRAPH.md`.)
 
 ## Co jest już w bazie
 

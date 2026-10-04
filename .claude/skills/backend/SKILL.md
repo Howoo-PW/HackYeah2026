@@ -23,7 +23,7 @@ Najpierw project-overview i docs/CONTRACT.md. API /api/v1; OpenAPI /docs.
 
 - app/routing/: `router.py` POST /route (limit 30/min na IP); `graph.py` auto i rower z własnego
   grafu w bazie (`find_route`, `routing_snap`, wagi użytkownika; opis w docs/ROUTING_GRAPH.md);
-  `providers.py` ORS/mock tylko dla pieszych; `scoring.py`, `segments.py` ocena tras pieszych.
+  `scoring.py` ogólny wynik trasy wg wag. Auto, rower i piesi z jednego grafu (ORS i mock usunięte).
 
 Wstawiaj routery B2/AI obok core_router; nie kopiuj ich implementacji.
 Ocena: unique(user_id,segment_id,rated_on); advisory lock i UPSERT w jednej
@@ -54,10 +54,13 @@ Dokumentacja: Context7, oficjalne Supabase/FastAPI/Psycopg/PyJWT.
   użytkownika, rank 2 najszybsza), limit 30/min na IP, snap max 600 m, health routing sprawdza graf.
   Testy: offline test_graph_routing.py i opcjonalny test_graph_db.py (RUN_DB_TESTS=1).
 
+- 2026-10-04, backend/foot-routing: `foot-walking` z grafu (po drogach), ORS, mock, przykładowe segmenty i `shapely`
+  usunięte; `/health` sprawdza graf trzech profili; granice obszaru tylko w `app/geo.py`.
+
 ## TODO
 
 - backend/b1-howoo: test pełnej integracji na .env zespołu i rzeczywistym JWT.
-- Piesi: własny graf pieszy zamiast ORS/mocka (dane OSM dla chodników); wtedy usunąć provider i przykładowe segmenty.
+- Piesi: faza 2 tylko gdyby brakowało ścieżek w parkach lub chodników (samodzielne `footway`, schody, przejścia).
 - Przeszkody, pora dnia i parkingi przy celu w koszcie grafu (B2); `score` bywa null: osobny PR do kontraktu.
 - Współdzielony limiter gotowy; produkcja wymaga chronionego dostępu do Redis.
 - B2: schemat/seed i odświeżanie segment_stats; B2/AI routery dodają właściciele.

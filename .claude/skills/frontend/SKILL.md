@@ -41,8 +41,8 @@ Backend ma gotowy `POST {VITE_API_URL}/route` (publiczny, bez tokenu). Pełny op
    żądań/min na IP) → poproś o chwilę cierpliwości.
 5. **Wydajność:** odpowiedź to zwykle 0,5–2 s. Przy ruszaniu suwakami używaj debounce i anuluj poprzednie
    żądanie (`AbortController`), pokazuj stan ładowania.
-6. **Piesi** (`foot-walking`) są jeszcze na zewnętrznym silniku lub przykładowych danych (jedna trasa przy `via`,
-   kilka bez): nie traktuj tych wyników jako docelowych, własny graf pieszy dopiero powstanie.
+6. **Piesi** (`foot-walking`) działają tak samo jak auto i rower: ten sam graf, `rank 1` wg wag i opcjonalny `rank 2`
+   najszybszy, `via` też. Pieszy chodzi po drogach (nie po chodnikach), w obie strony, 5 km/h.
 
 ## Stan
 
