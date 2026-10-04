@@ -1,6 +1,7 @@
 import { metricScore, type Metric } from '../lib/dimensions'
-import { mockComments, mockCreatedComment, mockCreatedRating, mockSegmentDetail, mockSegments } from './mocks'
-import type { ApiError, Bbox, GroupDetail, NearestSegment, Opinion, Paginated, Rating, RatingInput, RouteRequest, RouteResult, GroupMapCollection, SegmentCollection, SegmentDetail, StreetHit } from './types'
+import { supabase } from '../lib/supabase'
+import { mockComments, mockSegmentDetail, mockSegments } from './mocks'
+import type { ApiError, Bbox, GroupDetail, NearestSegment, Opinion, Paginated, Rating, RatingInput, RouteRequest, RouteResult, GroupMapCollection, MyOpinion, Photo, SegmentCollection, SegmentDetail, StreetHit } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api/v1'
 /** Force mock data even when the backend is up (set VITE_USE_MOCKS=true). */
@@ -133,24 +134,63 @@ function applyMockFilter(data: SegmentCollection, filter: SegmentFilter): Segmen
   return { ...data, features }
 }
 
-// Forms are UI-only for now: nothing is sent anywhere, the result lives in component state until reload.
-// TODO(backend/core): replace the bodies below with
-//   POST /segments/{id}/ratings  (body: RatingInput, 201 new / 200 replaced -> Rating)
-//   POST /segments/{id}/comments (body: { text }, 201 -> Comment)
-// and send the Supabase JWT as `Authorization: Bearer` (see getSession in lib/supabase.ts).
+/** Fired after a rating, comment or photo is saved, so the opinions list and the map can refresh. */
+export const OPINIONS_CHANGED = 'opinions-changed'
 
-/** Builds the rating the form just collected, locally. */
-export async function postRating(segmentId: number, input: RatingInput): Promise<Rating> {
-  return mockCreatedRating(segmentId, input)
+/** `Authorization: Bearer <Supabase access token>` for the signed-in user; throws a 401 error when nobody is signed in. */
+async function authHeader(): Promise<Record<string, string>> {
+  const { data } = (await supabase?.auth.getSession()) ?? { data: { session: null } }
+  if (!data.session) throw new ApiRequestError(401, 'UNAUTHORIZED', 'Zaloguj się, aby to zrobić.')
+  return { Authorization: `Bearer ${data.session.access_token}` }
 }
 
-/** Builds the opinion the form just collected, locally. */
-export async function postComment(
-  segmentId: number,
-  text: string,
-  author: { id: string; display_name: string },
-): Promise<Opinion> {
-  return mockCreatedComment(segmentId, text, author)
+/** Sends an authenticated write (JSON or multipart) and returns the parsed response. */
+async function write<T>(path: string, body: BodyInit, json: boolean, method = 'POST'): Promise<T> {
+  const headers = { ...(await authHeader()), ...(json && { 'Content-Type': 'application/json' }) }
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}${path}`, { method, headers, body })
+  } catch {
+    throw new ApiRequestError(0, 'NETWORK', 'Brak połączenia z serwerem.')
+  }
+  if (!res.ok) {
+    const err = (await res.json().catch(() => null)) as ApiError | null
+    throw new ApiRequestError(res.status, err?.error.code ?? 'INTERNAL_ERROR', err?.error.message ?? res.statusText, err?.error.details ?? null)
+  }
+  window.dispatchEvent(new Event(OPINIONS_CHANGED))
+  return res.json() as Promise<T>
+}
+
+/** POST /segments/{id}/ratings: creates today's rating or replaces it (201 new / 200 replaced). Only filled dimensions are sent. */
+export async function postRating(segmentId: number, input: RatingInput): Promise<Rating> {
+  const body = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== null && v !== undefined))
+  return write<Rating>(`/segments/${segmentId}/ratings`, JSON.stringify(body), true)
+}
+
+/** POST /segments/{id}/comments: the comment comes back with the author's latest rating of the road, when there is one. */
+export async function postComment(segmentId: number, text: string): Promise<Opinion> {
+  return write<Opinion>(`/segments/${segmentId}/comments`, JSON.stringify({ text }), true)
+}
+
+/** GET /segments/{id}/photos: visible photos with signed URLs, newest first. */
+export async function fetchPhotos(segmentId: number, page: number, pageSize: number, signal?: AbortSignal): Promise<Paginated<Photo>> {
+  return request<Paginated<Photo>>(`/segments/${segmentId}/photos?page=${page}&page_size=${pageSize}`, signal)
+}
+
+/** POST /segments/{id}/photos (multipart): JPEG / PNG / WebP up to 5 MB; the backend strips EXIF and makes a thumbnail. */
+export async function postPhoto(segmentId: number, file: File): Promise<Photo> {
+  const form = new FormData()
+  form.append('file', file)
+  return write<Photo>(`/segments/${segmentId}/photos`, form, false)
+}
+
+/** GET /segments/{id}/street: ids of the whole street (same name, joined end to end) the road belongs to; null when it cannot be loaded. */
+export async function fetchStreetIds(segmentId: number, signal?: AbortSignal): Promise<number[] | null> {
+  try {
+    return (await request<{ segment_ids: number[] }>(`/segments/${segmentId}/street`, signal)).segment_ids
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -208,4 +248,14 @@ export async function fetchRoutes(req: RouteRequest, signal?: AbortSignal): Prom
     if (signal?.aborted || err instanceof ApiRequestError) throw err
     throw new ApiRequestError(0, 'NETWORK', 'Nie można połączyć się z serwerem tras. Spróbuj ponownie.')
   }
+}
+
+/** GET /me/opinions: the signed-in user's own ratings and comments, newest first. Needs the Supabase access token. */
+export async function fetchMyOpinions(accessToken: string, signal?: AbortSignal): Promise<MyOpinion[]> {
+  const res = await fetch(`${API_URL}/me/opinions`, { signal, headers: { Authorization: `Bearer ${accessToken}` } })
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as ApiError | null
+    throw new ApiRequestError(res.status, body?.error.code ?? 'INTERNAL_ERROR', body?.error.message ?? res.statusText, body?.error.details ?? null)
+  }
+  return res.json() as Promise<MyOpinion[]>
 }

@@ -111,7 +111,7 @@ export default function AuthDialog({ onClose }: { onClose: () => void }) {
               <input
                 type="password"
                 required
-                minLength={6}
+                minLength={mode === 'login' ? undefined : 6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}

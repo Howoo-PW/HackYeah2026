@@ -32,3 +32,11 @@
 .req-slider::-moz-range-track {
   background: transparent;
 }
+
+/* Bigger zoom buttons; the basemap switch (BasemapSwitch.tsx) matches this size and sits above them. */
+.maplibregl-ctrl-group button.maplibregl-ctrl-zoom-in,
+.maplibregl-ctrl-group button.maplibregl-ctrl-zoom-out,
+.maplibregl-ctrl-group button.maplibregl-ctrl-geolocate {
+  width: 40px;
+  height: 40px;
+}

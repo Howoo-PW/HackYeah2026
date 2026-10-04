@@ -1,6 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { fetchSegmentDetail, fetchStreetIds } from './api/client'
 import type { SegmentFilter } from './api/client'
 import type { Place } from './api/types'
+import { useAuth } from './auth/useAuth'
+import { useMyOpinions } from './auth/useMyOpinions'
 import AccountButton from './auth/AccountButton'
 import FilterBar from './components/FilterBar'
 import BasemapSwitch from './components/BasemapSwitch'
@@ -26,9 +29,25 @@ export default function App() {
   const [dimension, setDimension] = useState<Metric>('overall')
   const [filter, setFilter] = useState<SegmentFilter>({ dimension: null, minScore: null, noObstacles: false })
   const [filtersOpen, setFiltersOpen] = useState(false)
+  /** "Tylko moje oceny": limits the map to the signed-in user's own roads (and their fragments). */
+  const [mineOnly, setMineOnly] = useState(false)
+  const { user } = useAuth()
+  const { opinions, failed } = useMyOpinions(user?.id)
+  const only = useMemo(
+    () =>
+      mineOnly && opinions
+        ? {
+            segmentIds: new Set(opinions.map((o) => o.segment_id)),
+            groupIds: new Set(opinions.flatMap((o) => (o.group_id === null ? [] : [o.group_id]))),
+          }
+        : null,
+    [mineOnly, opinions],
+  )
   const [selectedId, setSelectedId] = useState<number | null>(null)
   // Segments of the street stretch (group) of the selected piece, once the panel has loaded it.
   const [groupIds, setGroupIds] = useState<number[]>([])
+  // The whole street of the clicked piece (same name, joined end to end); the group above is only a stretch of it plus side streets.
+  const [street, setStreet] = useState<{ forId: number; ids: number[] } | null>(null)
   const [status, setStatus] = useState<Status>({ mock: false, error: null, zoomedOut: false, loading: false })
   const [place, setPlace] = useState<Place | null>(null)
   const [focus, setFocus] = useState<{ place: Place } | null>(null)
@@ -40,9 +59,30 @@ export default function App() {
     [plan.routes, plan.selected],
   )
 
+  useEffect(() => {
+    if (selectedId === null) return
+    const ctrl = new AbortController()
+    fetchStreetIds(selectedId, ctrl.signal).then((ids) => ids && !ctrl.signal.aborted && setStreet({ forId: selectedId, ids }))
+    return () => ctrl.abort()
+  }, [selectedId])
+
   const select = (id: number | null) => {
     setSelectedId(id)
     setGroupIds([])
+  }
+
+  /** Opens one of the user's own rated roads: shows it on the map and opens its panel. */
+  const openRatedSegment = async (id: number) => {
+    select(id)
+    try {
+      const d = await fetchSegmentDetail(id)
+      const xs = d.geometry.coordinates.map((c) => c[0])
+      const ys = d.geometry.coordinates.map((c) => c[1])
+      const [w, e, s, n] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
+      setFocus({ place: { lat: (s + n) / 2, lon: (w + e) / 2, name: d.name ?? '', detail: null, bounds: [w, s, e, n] } })
+    } catch {
+      // The panel is already open; only the map move is skipped.
+    }
   }
 
   const changeDimension = (d: Metric) => {
@@ -78,7 +118,9 @@ export default function App() {
         basemap={basemap}
         dimension={dimension}
         filter={filter}
-        selectedIds={groupIds.length > 0 ? groupIds : selectedId !== null ? [selectedId] : []}
+        only={only}
+        selectedIds={street && street.forId === selectedId ? street.ids : groupIds.length > 0 ? groupIds : selectedId !== null ? [selectedId] : []}
+        primaryId={selectedId}
         onSelect={select}
         focus={focus}
         placeMarker={place}
@@ -117,13 +159,13 @@ export default function App() {
               <button
                 onClick={() => setFiltersOpen((o) => !o)}
                 aria-expanded={filtersOpen}
-                className="rounded-full bg-white px-4 py-2 text-sm font-medium shadow-lg ring-1 ring-black/5 transition hover:bg-gray-50"
+                className="flex-1 rounded-full bg-white px-4 py-2 text-sm font-medium shadow-lg ring-1 ring-black/5 transition hover:bg-gray-50"
               >
-                Filtry i kolory
+                Oceny
               </button>
               <button
                 onClick={() => startRoute()}
-                className="rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-lg transition hover:bg-gray-700"
+                className="flex-1 rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-lg transition hover:bg-gray-700"
               >
                 Trasa
               </button>
@@ -146,20 +188,37 @@ export default function App() {
         )}
       </div>
 
-      <div className="pointer-events-auto absolute right-3 top-3 flex items-center gap-3 rounded-full bg-white py-1.5 pl-4 pr-2 shadow-lg ring-1 ring-black/5">
-        <span className="hidden text-sm font-bold sm:inline">Rate My Road</span>
-        <AccountButton />
+      <div className="pointer-events-auto absolute right-3 top-3 z-30 flex items-center gap-3 rounded-full bg-white py-2 pl-5 pr-2 shadow-lg ring-1 ring-black/5">
+        <Logo />
+        <AccountButton opinions={opinions} failed={failed} onOpenSegment={openRatedSegment} mineOnly={mineOnly} onToggleMine={() => setMineOnly((m) => !m)} />
       </div>
 
       {!routing && <Legend metric={dimension} />}
       <BasemapSwitch basemap={basemap} onChange={setBasemap} />
 
       {!routing && selectedId !== null && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex md:inset-x-auto md:bottom-auto md:right-3 md:top-14">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex pr-16 md:inset-x-auto md:bottom-auto md:right-16 md:top-20 md:pr-0">
           <SegmentPanel key={selectedId} segmentId={selectedId} onGroup={setGroupIds} onClose={() => select(null)} />
         </div>
       )}
     </div>
+  )
+}
+
+/** "Rate My" with "Road" on asphalt (dark navy, yellow dashed center line drawn over the letters), as on the cover. */
+function Logo() {
+  return (
+    <span className="hidden items-center gap-1.5 text-xl font-extrabold uppercase tracking-tight text-gray-900 sm:inline-flex">
+      Rate My
+      <span className="relative rounded-md bg-indigo-950 px-2 py-0.5 text-white">
+        <span className="relative">Road</span>
+        <span
+          aria-hidden
+          className="absolute inset-x-0 top-1/2 z-10 h-[3px] -translate-y-1/2"
+          style={{ backgroundImage: 'repeating-linear-gradient(to right, #fbbf24 0 8px, transparent 8px 14px)' }}
+        />
+      </span>
+    </span>
   )
 }
 

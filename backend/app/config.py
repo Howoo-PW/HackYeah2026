@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     cors_origins: str = "http://localhost:5173"
     ai_service_url: str = "http://localhost:8001"
+    # Numeric ratings in the AI summary are switched off for now (comments and photos only); the code for them is kept.
+    summary_use_ratings: bool = False
     internal_api_key: str = ""
     supabase_url: str = ""
     supabase_anon_key: SecretStr = SecretStr("")

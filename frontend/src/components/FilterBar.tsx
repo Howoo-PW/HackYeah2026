@@ -18,7 +18,7 @@ export default function FilterBar({ dimension, onDimension, filter, onFilter, on
   return (
     <section className="pointer-events-auto w-full overflow-hidden rounded-2xl bg-white/95 shadow-xl ring-1 ring-black/5 backdrop-blur">
       <header className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
-        <h1 className="text-base font-bold">Filtry i kolory mapy</h1>
+        <h1 className="text-base font-bold">Oceny</h1>
         <button onClick={onClose} aria-label="Zamknij filtry" className="rounded-full p-1.5 text-gray-600 hover:bg-gray-100">
           ✕
         </button>
@@ -78,7 +78,8 @@ export default function FilterBar({ dimension, onDimension, filter, onFilter, on
                 disabled={filter.minScore === null}
                 onChange={(e) => onFilter({ ...filter, dimension, minScore: Number(e.target.value) })}
                 aria-label="Minimalna ocena"
-                className="h-2 flex-1 cursor-pointer accent-gray-900"
+                className="req-slider flex-1"
+                style={{ '--fill': `${(minScore - 1) * 25}%` } as React.CSSProperties}
               />
               <span className="w-8 rounded-md bg-gray-900 py-0.5 text-center text-xs font-bold text-white">≥ {minScore}</span>
             </div>

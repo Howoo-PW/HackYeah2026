@@ -6,10 +6,44 @@ import type { PointKey, RouteDraftApi } from '../routing/useRouteDraft'
 import type { RoutePlanApi } from '../routing/useRoutePlan'
 import SearchBox from './SearchBox'
 
-const PROFILES: { id: RouteProfile; label: string }[] = [
-  { id: 'driving-car', label: 'Auto'},
-  { id: 'cycling-regular', label: 'Rower'},
-  { id: 'foot-walking', label: 'Pieszo'},
+const ICON_PROPS = { width: 28, height: 28, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinejoin: 'round', strokeLinecap: 'round' } as const
+
+/** Travel profiles shown as icon buttons (car, bike, pedestrian); `label` is the tooltip and screen-reader name. */
+const PROFILES: { id: RouteProfile; label: string; icon: React.ReactNode }[] = [
+  {
+    id: 'driving-car',
+    label: 'Auto',
+    icon: (
+      <svg {...ICON_PROPS} aria-hidden>
+        <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
+        <circle cx="7" cy="17" r="2" />
+        <path d="M9 17h6" />
+        <circle cx="17" cy="17" r="2" />
+      </svg>
+    ),
+  },
+  {
+    id: 'cycling-regular',
+    label: 'Rower',
+    icon: (
+      <svg {...ICON_PROPS} aria-hidden>
+        <circle cx="18.5" cy="17.5" r="3.5" />
+        <circle cx="5.5" cy="17.5" r="3.5" />
+        <circle cx="15" cy="5" r="1" />
+        <path d="M12 17.5V14l-3-3 4-3 2 3h2" />
+      </svg>
+    ),
+  },
+  {
+    id: 'foot-walking',
+    label: 'Pieszo',
+    icon: (
+      <svg {...ICON_PROPS} aria-hidden>
+        <circle cx="12" cy="5" r="1" />
+        <path d="m9 20 3-6 3 6M6 8l6 2 6-2M12 10v4" />
+      </svg>
+    ),
+  },
 ]
 
 /** Three slider positions and the contract weight (0–3) each one stands for. */
@@ -37,8 +71,14 @@ export default function RoutePanel({ route, plan, onBack }: Props) {
   return (
     <section className="pointer-events-auto max-h-[calc(100dvh-1.5rem)] w-full overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-black/5">
       <header className="flex items-center gap-2 border-b border-gray-100 px-3 py-2.5">
-        <button onClick={onBack} aria-label="Wróć do mapy" className="rounded-full p-1.5 text-lg text-gray-700 hover:bg-gray-100">
-          ←
+        <button
+          onClick={onBack}
+          aria-label="Wróć do mapy"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-gray-700 hover:bg-gray-100"
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
         </button>
         <h1 className="text-base font-bold">Wyznacz trasę</h1>
       </header>
@@ -90,12 +130,14 @@ export default function RoutePanel({ route, plan, onBack }: Props) {
               key={p.id}
               role="radio"
               aria-checked={draft.profile === p.id}
+              aria-label={p.label}
+              title={p.label}
               onClick={() => route.setProfile(p.id)}
-              className={`rounded-xl py-2.5 text-sm font-medium transition ${
+              className={`flex items-center justify-center rounded-xl py-2.5 transition ${
                 draft.profile === p.id ? 'bg-gray-900 text-white shadow' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              {p.label}
+              {p.icon}
             </button>
           ))}
         </div>
@@ -106,14 +148,12 @@ export default function RoutePanel({ route, plan, onBack }: Props) {
             <li key={d.id}>
               <RequirementSlider
                 label={d.label}
-                hint={`unikaj: ${d.low}`}
                 value={draft.weights[d.id]}
                 onChange={(v) => route.setWeight(d.id as Dimension, v)}
               />
             </li>
           ))}
         </ul>
-        <p className="mt-2 text-[11px] text-gray-600">Wszystko na „Nieważne” oznacza po prostu najszybszą trasę.</p>
 
         <button
           onClick={plan.run}
@@ -171,8 +211,8 @@ function PointRow({ label, placeholder, color, pointKey, route, active, onRemove
 
   return (
     <div className={`rounded-xl border p-2 transition ${active ? 'border-gray-900 bg-gray-50' : 'border-gray-200'}`}>
-      <div className="flex items-start gap-2">
-        <span className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${color}`}>
+      <div className="flex items-center gap-2">
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${color}`}>
           {label}
         </span>
         <div className="min-w-0 flex-1">
@@ -184,14 +224,21 @@ function PointRow({ label, placeholder, color, pointKey, route, active, onRemove
             onPick={(p: Place) => route.place(pointKey, p)}
             onClear={() => route.clearPoint(pointKey)}
           />
-          {place?.detail && <p className="mt-0.5 truncate px-1 text-xs text-gray-600">{place.detail}</p>}
         </div>
         {onRemove && (
-          <button onClick={onRemove} aria-label={`Usuń przystanek ${label}`} className="mt-1 rounded-full px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50">
-            Usuń
+          <button
+            onClick={onRemove}
+            aria-label={`Usuń przystanek ${label}`}
+            title="Usuń"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-red-600 transition hover:bg-red-50"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" />
+            </svg>
           </button>
         )}
       </div>
+      {place?.detail && <p className="mt-0.5 truncate pl-9 pr-1 text-xs text-gray-600">{place.detail}</p>}
       <div className="mt-2 flex gap-1.5 pl-9 text-xs">
         <button
           onClick={() => route.startPicking(pointKey)}
@@ -199,7 +246,7 @@ function PointRow({ label, placeholder, color, pointKey, route, active, onRemove
             active ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
-          {active ? '📍 Kliknij na mapie…' : '📍 Wskaż na mapie'}
+          {active ? '📍 Kliknij na mapie' : '📍 Wskaż na mapie'}
         </button>
         <button
           onClick={useMyLocation}
@@ -216,12 +263,10 @@ function PointRow({ label, placeholder, color, pointKey, route, active, onRemove
 /** Thick snapping slider with three steps (not important / important / very important). */
 function RequirementSlider({
   label,
-  hint,
   value,
   onChange,
 }: {
   label: string
-  hint: string
   /** Contract weight 0–3. */
   value: number
   onChange: (weight: 0 | 1 | 2 | 3) => void
@@ -250,7 +295,6 @@ function RequirementSlider({
           <span key={l.text}>{l.text}</span>
         ))}
       </div>
-      <p className="mt-0.5 text-[11px] text-gray-600">{hint}</p>
     </div>
   )
 }

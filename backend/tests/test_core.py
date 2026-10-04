@@ -78,7 +78,7 @@ def login(role="user"):
 
 
 @pytest.mark.parametrize("path,method,body", [
-    ("/me", "get", None), ("/segments/1/ratings", "post", {"surface": 4}),
+    ("/me", "get", None), ("/me/opinions", "get", None), ("/segments/1/ratings", "post", {"surface": 4}),
     ("/segments/1/comments", "post", {"text": "Test"}),
     (f"/admin/comments/{uuid4()}", "patch", {"status": "hidden"}),
 ])

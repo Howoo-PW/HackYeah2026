@@ -63,8 +63,8 @@ Stan opisuje bieżący branch; nie oznaczaj cudzych zmian jako scalonych.
 - backend/b1-howoo: sekrety DB/service_role i test rzeczywistego JWT/zapisów odroczone
   na prośbę użytkownika. Kontenery demo działają; DB health=503 bez konfiguracji.
 - db/seed-krakow (B2): seed Krakowa i weryfikacja harmonogramu segment_stats.
-- backend/photos, parkingi (B2): zdjęcia i Storage, GET /parking. Przeszkody gotowe.
-- backend/ai-integration (AI): cache; routing mock wymienić na rzeczywisty provider
+- backend/parkingi (B2): GET /parking. Przeszkody gotowe; zdjęcia (upload, galeria, EXIF, miniatury) zrobione w backend/ai-integration.
+- backend/ai-integration (AI): podsumowania i cache działają (patrz skill ai); routing mock wymienić na rzeczywisty provider
   i źródło segmentów PostGIS. Integracja serwisu AI/routingu poza zakresem B1.
 - frontend/* (FE): mapa, Auth/formularze i PWA na branchach FE.
 - setup/repo: sprawdzić uprawnienia zespołu; ochrona main gotowa.

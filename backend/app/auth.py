@@ -1,5 +1,6 @@
 """Supabase access token verification; roles are read only from app_metadata."""
 
+import time
 from dataclasses import dataclass
 from functools import lru_cache
 from uuid import UUID
@@ -13,6 +14,7 @@ from .config import settings
 from .errors import AppError
 
 bearer = HTTPBearer(auto_error=False)
+IAT_TOLERANCE_S = 10
 
 
 @dataclass(frozen=True)
@@ -38,6 +40,9 @@ def verify_token(token: str) -> User:
     try:
         algorithm = jwt.get_unverified_header(token).get("alg")
         options = {"require": ["exp", "iat", "sub", "iss", "aud"]}
+        # `iat` is checked by hand below with a few seconds of tolerance: a token used right after login can be
+        # "issued" slightly in our future when the clocks differ. `exp` stays strict.
+        options["verify_iat"] = False
         if algorithm in ("ES256", "RS256"):
             key = jwks_client(url).get_signing_key_from_jwt(token)
             claims = jwt.decode(token, key.key, algorithms=["ES256", "RS256"],
@@ -56,7 +61,7 @@ def verify_token(token: str) -> User:
                 raise ValueError("Auth rejected token")
             verified = response.json()
             claims = jwt.decode(token, options={**options, "verify_signature": False,
-                                "verify_exp": True, "verify_iat": True, "verify_nbf": True,
+                                "verify_exp": True, "verify_iat": False, "verify_nbf": True,
                                 "verify_iss": True, "verify_aud": True},
                                 issuer=f"{url}/auth/v1", audience="authenticated")
             if claims["sub"] != verified["id"]:
@@ -65,6 +70,8 @@ def verify_token(token: str) -> User:
             email = verified.get("email", "")
         else:
             raise ValueError("Unsupported algorithm")
+        if not isinstance(claims["iat"], (int, float)) or claims["iat"] > time.time() + IAT_TOLERANCE_S:
+            raise ValueError("Token issued in the future")
         if claims.get("role") != "authenticated":
             raise ValueError("Not a user token")
         return User(UUID(claims["sub"]), email, "admin" if metadata.get("role") == "admin" else "user")
