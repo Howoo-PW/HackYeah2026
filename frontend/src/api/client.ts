@@ -1,7 +1,7 @@
 import { metricScore, type Metric } from '../lib/dimensions'
 import { supabase } from '../lib/supabase'
 import { mockComments, mockSegmentDetail, mockSegments } from './mocks'
-import type { ApiError, Bbox, GroupDetail, NearestSegment, Opinion, Paginated, Rating, RatingInput, RouteRequest, RouteResult, GroupMapCollection, MyOpinion, Photo, SegmentCollection, SegmentDetail, StreetHit } from './types'
+import type { ApiError, AssistantResponse, Bbox, GroupDetail, NearestSegment, Opinion, Paginated, Rating, RatingInput, RouteRequest, RouteResult, GroupMapCollection, MyOpinion, Photo, SegmentCollection, SegmentDetail, StreetHit } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api/v1'
 /** Force mock data even when the backend is up (set VITE_USE_MOCKS=true). */
@@ -258,4 +258,18 @@ export async function fetchMyOpinions(accessToken: string, signal?: AbortSignal)
     throw new ApiRequestError(res.status, body?.error.code ?? 'INTERNAL_ERROR', body?.error.message ?? res.statusText, body?.error.details ?? null)
   }
   return res.json() as Promise<MyOpinion[]>
+}
+
+/**
+ * POST /assistant: describe a route or a place in words. Takes several seconds (the model reads the request, the backend
+ * routes and collects ratings and comments, the model writes the answer). Errors keep the server's status (429 too many questions,
+ * 502 AI unavailable).
+ */
+export async function askAssistant(query: string, signal?: AbortSignal): Promise<AssistantResponse> {
+  try {
+    return await request<AssistantResponse>('/assistant', signal, { query })
+  } catch (err) {
+    if (signal?.aborted || err instanceof ApiRequestError) throw err
+    throw new ApiRequestError(0, 'NETWORK', 'Brak połączenia z serwerem.')
+  }
 }

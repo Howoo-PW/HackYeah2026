@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
+from .assistant import router as assistant_router
 from .config import settings
 from .core import router as core_router
 from .database import create_pool
@@ -51,6 +52,7 @@ api = APIRouter(prefix="/api/v1")
 api.include_router(core_router)
 api.include_router(obstacles_router)
 api.include_router(routing_router)
+api.include_router(assistant_router)
 
 
 async def _check_ai() -> str:
