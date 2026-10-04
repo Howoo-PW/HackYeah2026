@@ -4,6 +4,21 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 
 <!-- wpisy -->
 
+## 2026-10-04 — Beata — gałąź `feature/ai-assistant` (poprawki asystenta, seed Wisły)
+
+**Zrobione:**
+- Plan AI: „wzdłuż Wisły / przez Planty / przez ulicę X” daje 1–3 konkretne punkty pośrednie (`via_places`); backend pomija punkt pośredni, którego nie znajdzie (błąd tylko dla startu i celu).
+- Panel asystenta: (przyciski „Dodaj punkt startowy / końcowy” dodane, a potem usunięte na prośbę); w trasie od asystenta przycisk „Zapytaj ponownie”.
+- Seed `scripts/seed_vistula.py` (tag `vistula-2026-10`): 84 odcinki nad Wisłą (bulwary, Bulwarowa, Podgórska/Konopnickiej przy bulwarze), 249 ocen i 30 komentarzy w stylu „fajna droga wzdłuż Wisły”. Cofnięcie: `python scripts/seed_vistula.py --remove`. Migracja `20261008120000_comments_seed_tag.sql` (kolumna `comments.seed_tag`) zastosowana na bazie online.
+
+- Trasy „wzdłuż Wisły”: model ustawia tylko `along_river`, a backend sam wybiera 1–3 punkty z bulwarów w bazie (`assistant_river.py`, `osm_ways` „Bulwar …”) tak, żeby prawie nie wydłużały drogi start→cel, w kolejności jazdy i osiągalne dla profilu (≤150 m od drogi); punkty nieosiągalne (np. ścieżka dla auta) są pomijane. Bez środka transportu i przy bulwarach/rzece profil to rower. Testy: `backend/tests/test_assistant_river.py`.
+
+- Wyszukiwanie po sensie komentarzy (pgvector): migracja `20261008130000_comment_embeddings.sql` (tabela `comment_embeddings`, 1536 wymiarów, HNSW, RLS bez polityk), `POST /embed` w serwisie AI (`text-embedding-3-small`), `backend/app/embeddings.py` (nowy komentarz embedowany w tle), `scripts/embed_comments.py` (uzupełnienie: 1100 komentarzy zrobione). Plan AI ma pole `topic`; opis słowami („spokojna droga nad wodą”) szuka fragmentów ulic po podobieństwie komentarzy (`do_streets_by_meaning`), kryterium z pięciu wymiarów nadal liczy oceny.
+
+**Dalej / blokery:**
+- Bulwary (ścieżki) w większości nie są w tabeli `segments`, więc nie da się ich ocenić ani wybrać autem; seed objął te, które są.
+- Test pominiętego punktu pośredniego w backendzie i dokumentacja skilli do dopisania.
+
 ## 2026-10-04 — Beata — gałąź `feature/ai-assistant`
 
 **Zadanie:** wyszukiwarka tras i miejsc z opisu słowami, z agentem AI, który korzysta z ocen, komentarzy i danych (docs/ASSISTANT.md).

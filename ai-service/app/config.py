@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     ai_structured_method: str | None = None
     # Reasoning models: "minimal" (native OpenAI gpt-5 family) or "low" (OpenRouter) cuts latency a lot.
     ai_reasoning_effort: str | None = None
+    # Embeddings (comment search by meaning); OpenAI-compatible API, same key and base URL as the chat model.
+    ai_embedding_model: str = "text-embedding-3-small"
     ai_timeout_s: float = 12.0  # below the backend's 15 s timeout from the contract
 
 

@@ -6,10 +6,10 @@ import secrets
 from fastapi import Depends, FastAPI, Header
 
 from .assistant_mock import mock_answer, mock_plan
-from .assistant_schemas import AnswerOut, AnswerRequest, AssistantRequest, PlanOut
+from .assistant_schemas import AnswerOut, AnswerRequest, AssistantRequest, EmbedOut, EmbedRequest, PlanOut
 from .config import settings
 from .errors import AppError, install_error_handlers
-from .mock import MOCK_MODEL, MOCK_SUMMARY, MOCK_SURFACE
+from .mock import MOCK_MODEL, MOCK_SUMMARY, MOCK_SURFACE, mock_embedding
 from .schemas import SummarizeRequest, SummaryOut, SurfaceOut, SurfaceRequest
 
 log = logging.getLogger("ai")
@@ -79,3 +79,11 @@ async def assistant_answer(req: AnswerRequest) -> AnswerOut:
         return AnswerOut(answer=mock_answer(req), model=MOCK_MODEL)
     content = await _call_llm("answer", req)
     return AnswerOut(**content.model_dump(), model=settings.ai_model)
+
+
+@app.post("/embed", response_model=EmbedOut, dependencies=[Depends(require_internal_key)])
+async def embed(req: EmbedRequest) -> EmbedOut:
+    """Vectors for comments and search descriptions (1536 numbers each), for finding comments by meaning."""
+    if settings.mock_ai:
+        return EmbedOut(vectors=[mock_embedding(t) for t in req.texts], model=MOCK_MODEL)
+    return EmbedOut(vectors=await _call_llm("embed", req.texts), model=settings.ai_embedding_model)

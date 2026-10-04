@@ -37,6 +37,10 @@ class FakeAi:
             raise AppError(502, "AI_UNAVAILABLE", "Asystent AI jest chwilowo niedostępny")
         return self._plan
 
+    async def embed(self, text):
+        self.embedded = text
+        return [0.0] * 3
+
     async def answer(self, query, intent, fact_lines):
         self.answer_calls.append((intent, fact_lines))
         if self.fail_answer:
@@ -57,6 +61,7 @@ class FakeGeo:
 class FakeData:
     def __init__(self, segment=None, rows=None):
         self.segment, self.rows = segment, rows or []
+        self.meaning_rows = []
         self.fact_calls = []
 
     def nearest_segment(self, lat, lon, max_m=80):
@@ -68,6 +73,10 @@ class FakeData:
     def segment_facts(self, ids, on_route=True):
         self.fact_calls.append(list(ids))
         return ["Ulica Dietla: nawierzchnia: dobra; oceniona przez wielu użytkowników.", "Komentarz użytkownika z 2026-09-28: „Nowy asfalt.”"]
+
+    def comments_by_meaning(self, vector_text, bbox, outline, count, min_similarity):
+        self.meaning_args = (vector_text, bbox, count, min_similarity)
+        return self.meaning_rows
 
     def top_fragments(self, dimension, want, bbox, count, outline=None):
         self.bbox, self.outline = bbox, outline
@@ -350,3 +359,35 @@ def test_geocoder_remembers_misses_and_turns_failures_into_502(monkeypatch):
     with pytest.raises(AppError) as exc:
         asyncio.run(broken.find("Wawel"))
     assert exc.value.status == 502 and exc.value.code == "UPSTREAM_ERROR"
+
+
+# ---- streets by meaning (comments embedded with pgvector) -------------------------------------------------------------
+
+def meaning_row(**kw):
+    return {"group_id": 7, "name": "Podgórska", "highway": "tertiary", "length_m": 420.0, "ratings": 5, "surface": 4.0, "views": 4.8, "safety": 4.0,
+            "traffic": 4.5, "parking": None, "lat": 50.05, "lon": 19.94, "similarity": 0.51, "texts": ["Spokojnie i widok na wodę."], **kw}
+
+
+def test_description_in_words_searches_comments_by_meaning():
+    ai, data = FakeAi(AiPlan(intent="streets", restated="Spokojna droga nad wodą.", topic="spokojna droga nad wodą", count=2, model="m")), FakeData()
+    data.meaning_rows = [meaning_row()]
+    result = run("spokojna droga nad wodą", deps(ai, data=data))
+
+    assert ai.embedded == "spokojna droga nad wodą"
+    assert data.meaning_args[0] == "[0.000000,0.000000,0.000000]" and data.meaning_args[2:] == (2, assistant.MIN_SIMILARITY)
+    assert result.intent == "streets" and [s.name for s in result.streets] == ["Podgórska"] and result.streets[0].segment_ids == [20, 21]
+    _, lines = ai.answer_calls[0]
+    assert any("Spokojnie i widok na wodę" in line for line in lines)  # the matching comment is a fact the answer is written from
+
+
+def test_no_matching_comments_asks_for_another_description():
+    ai = FakeAi(AiPlan(intent="streets", restated="x", topic="coś dziwnego", model="m"))
+    result = run("coś dziwnego", deps(ai, data=FakeData()))
+    assert result.intent == "clarify" and "coś dziwnego" in result.answer and ai.answer_calls == []
+
+
+def test_a_dimension_still_ranks_by_ratings_not_by_meaning():
+    data = FakeData(rows=[{**meaning_row(), "ratings": 3}])
+    ai = FakeAi(AiPlan(intent="streets", restated="x", dimension="views", topic="ładnie", model="m"))
+    run("najlepsze widoki", deps(ai, data=data))
+    assert not hasattr(data, "meaning_args") and data.bbox is None

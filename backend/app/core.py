@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Path, Query
 
 from .auth import User, optional_user, require_admin, require_user
 from . import photos as photo_store
-from . import summaries
+from . import embeddings, summaries
 from .database import get_repository
 from .errors import AppError
 from .geo import clamp_bbox, parse_bbox, validate_point
@@ -103,10 +103,13 @@ def comments(segment_id: SegmentId, repo: RepositoryDep,
 
 @router.post("/segments/{segment_id}/comments", response_model=Comment, status_code=201, tags=["comments"])
 def comment(segment_id: SegmentId, payload: CommentCreate, user: UserDep,
-            repo: RepositoryDep, request: Request):
-    """Create a verified user's comment under the 10-attempt hourly limit."""
+            repo: RepositoryDep, request: Request, background: BackgroundTasks):
+    """Create a verified user's comment under the 10-attempt hourly limit; its embedding (search by meaning) is made in the background."""
     request.app.state.rate_limiter.check(str(user.id), "comments", 10)
-    return repo.comment(segment_id, user.id, payload.text)
+    created = repo.comment(segment_id, user.id, payload.text)
+    if getattr(request.app.state, "db_pool", None) is not None:
+        background.add_task(embeddings.index_comment, request.app.state.db_pool, created["id"])
+    return created
 
 
 @router.patch("/admin/comments/{comment_id}", response_model=Comment, tags=["admin"])

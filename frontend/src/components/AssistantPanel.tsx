@@ -10,6 +10,10 @@ const EXAMPLES = [
 ]
 
 type Props = {
+  /** Text to start with (e.g. the previous question when the user asks again). */
+  initialQuery?: string
+  /** Called with the typed question each time one is sent, so it can be offered again later. */
+  onQuery?: (query: string) => void
   /** Called with every answer so the app can show the route, the place or the streets on the map. */
   onResult: (result: AssistantResponse) => void
   /** Opens one of the streets the assistant found (its details and the map). */
@@ -31,8 +35,8 @@ function errorText(err: unknown): string {
  * "Asystent AI": describe a route or a place in your own words. The answer is built from the ratings, comments and
  * obstacles in the database; a route opens in the route planner, a place on the map, streets as numbered pins.
  */
-export default function AssistantPanel({ onResult, onOpenStreet, onClose }: Props) {
-  const [query, setQuery] = useState('')
+export default function AssistantPanel({ initialQuery = '', onQuery, onResult, onOpenStreet, onClose }: Props) {
+  const [query, setQuery] = useState(initialQuery)
   const [result, setResult] = useState<AssistantResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -43,6 +47,7 @@ export default function AssistantPanel({ onResult, onOpenStreet, onClose }: Prop
   const ask = async (text: string) => {
     const q = text.trim()
     if (q.length < 3 || busy) return
+    onQuery?.(q)
     ctrl.current?.abort()
     const c = new AbortController()
     ctrl.current = c

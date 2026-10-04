@@ -34,6 +34,8 @@ export default function App() {
   /** Streets found by the assistant (numbered pins, highlighted when zoomed in) and its reply for a route it opened. */
   const [aiStreets, setAiStreets] = useState<AssistantStreet[]>([])
   const [assistantNote, setAssistantNote] = useState<string | null>(null)
+  /** The last question typed to the assistant, offered again by "Zapytaj ponownie". */
+  const [assistantQuery, setAssistantQuery] = useState('')
   /** "Tylko moje oceny": limits the map to the signed-in user's own roads (and their fragments). */
   const [mineOnly, setMineOnly] = useState(false)
   const { user } = useAuth()
@@ -145,6 +147,18 @@ export default function App() {
     setFocus({ place: { lat: street.location.lat, lon: street.location.lon, name: street.name, detail: null, bounds: null } })
   }
 
+  /** Back from a route the assistant made to its question box (the route is dropped, the question stays). */
+  const askAssistantAgain = () => {
+    leaveRoute()
+    setAssistantOpen(true)
+  }
+
+  /** Closes the assistant and takes its numbered pins off the map. */
+  const closeAssistant = () => {
+    setAssistantOpen(false)
+    setAiStreets([])
+  }
+
   const leaveRoute = () => {
     setAssistantNote(null)
     plan.clear()
@@ -184,7 +198,7 @@ export default function App() {
 
       <div className="pointer-events-none absolute left-0 top-0 flex w-[calc(100%-6.5rem)] max-w-md flex-col gap-2 p-3 md:w-full">
         {routing ? (
-          <RoutePanel route={route} plan={plan} note={assistantNote} onDismissNote={() => setAssistantNote(null)} onBack={leaveRoute} />
+          <RoutePanel route={route} plan={plan} note={assistantNote} onDismissNote={() => setAssistantNote(null)} onAskAgain={askAssistantAgain} onBack={leaveRoute} />
         ) : (
           <>
             <div className="pointer-events-auto">
@@ -209,7 +223,7 @@ export default function App() {
               <button
                 onClick={() => {
                   setFiltersOpen((o) => !o)
-                  setAssistantOpen(false)
+                  closeAssistant()
                 }}
                 aria-expanded={filtersOpen}
                 className="flex-1 rounded-full bg-white px-4 py-2 text-sm font-medium shadow-lg ring-1 ring-black/5 transition hover:bg-gray-50"
@@ -224,7 +238,8 @@ export default function App() {
               </button>
               <button
                 onClick={() => {
-                  setAssistantOpen((o) => !o)
+                  if (assistantOpen) closeAssistant()
+                  else setAssistantOpen(true)
                   setFiltersOpen(false)
                 }}
                 aria-expanded={assistantOpen}
@@ -235,7 +250,7 @@ export default function App() {
               </button>
             </div>
 
-            {assistantOpen && <AssistantPanel onResult={applyAssistant} onOpenStreet={openAiStreet} onClose={() => setAssistantOpen(false)} />}
+            {assistantOpen && <AssistantPanel initialQuery={assistantQuery} onQuery={setAssistantQuery} onResult={applyAssistant} onOpenStreet={openAiStreet} onClose={closeAssistant} />}
 
             {filtersOpen && (
               <FilterBar

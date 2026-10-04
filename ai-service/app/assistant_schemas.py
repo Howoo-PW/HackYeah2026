@@ -32,12 +32,14 @@ class AssistantPlan(BaseModel):
     restated: str = Field(description="One short sentence in Polish saying what the user wants, in your own words")
     from_place: str | None = Field(default=None, description="route: where it starts, as a searchable place name in nominative case (e.g. 'Rynek Główny'), else null")
     to_place: str | None = Field(default=None, description="route: where it ends, as a searchable place name in nominative case, else null")
-    via_places: list[str] = Field(default_factory=list, max_length=3, description="route: places the route must pass through, in order; usually empty")
+    via_places: list[str] = Field(default_factory=list, max_length=3, description="route: concrete streets/places the route must pass through, in order, only when the user names them ('przez Planty', 'przez ulicę X'); empty for 'along the Vistula' (use along_river)")
+    along_river: bool = Field(default=False, description="route: true when the route should follow the Vistula / the river bank ('wzdłuż Wisły', 'nad rzeką', 'bulwarami'); the app picks the points on the bank itself")
     profile: Profile = Field(default="driving-car", description="driving-car (default), cycling-regular for a bike, foot-walking for walking")
     weights: PlanWeights = Field(default_factory=PlanWeights, description="route: what matters to the user; all zeros = simply the fastest route")
     place_query: str | None = Field(default=None, description="place: the place or street to show, in nominative case, else null")
     area: str | None = Field(default=None, description="streets: a district or area of Krakow to look in (e.g. 'Kazimierz'), null = the whole city")
     dimension: Dimension | None = Field(default=None, description="streets: the criterion (surface, views, safety, traffic = calm, parking), else null")
+    topic: str | None = Field(default=None, description="streets: when no single criterion fits and the user describes the kind of road in words ('spokojna droga nad wodą', 'klimatyczne uliczki', 'ścieżka wśród zieleni'), that description in Polish; dimension is then null; else null")
     want: Literal["best", "worst"] = Field(default="best", description="streets: the best or the worst ones")
     count: int = Field(default=3, ge=1, le=5, description="streets: how many to find")
 
@@ -59,4 +61,16 @@ class AnswerContent(BaseModel):
 
 
 class AnswerOut(AnswerContent):
+    model: str
+
+
+EMBED_DIMENSIONS = 1536
+
+
+class EmbedRequest(BaseModel):
+    texts: list[Annotated[str, Field(min_length=1, max_length=2000)]] = Field(min_length=1, max_length=64)
+
+
+class EmbedOut(BaseModel):
+    vectors: list[list[float]]
     model: str

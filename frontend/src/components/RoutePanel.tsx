@@ -62,6 +62,8 @@ type Props = {
   /** The assistant's reply when this route came from it; shown above the points. */
   note?: string | null
   onDismissNote?: () => void
+  /** Opens the assistant again (with the previous question) when the user is not happy with its route. */
+  onAskAgain?: () => void
   onBack: () => void
 }
 
@@ -70,7 +72,7 @@ type Props = {
  * (searched by street name or picked on the map), travel profile and optional requirements for road quality.
  * "Wyznacz trasę" asks the backend (POST /route) and lists the alternatives; the selected one is drawn on the map.
  */
-export default function RoutePanel({ route, plan, note, onDismissNote, onBack }: Props) {
+export default function RoutePanel({ route, plan, note, onDismissNote, onAskAgain, onBack }: Props) {
   const { draft, error } = route
   const request = buildRouteRequest(draft)
   const active = activePoint(draft)
@@ -105,6 +107,11 @@ export default function RoutePanel({ route, plan, note, onDismissNote, onBack }:
               )}
             </div>
             <p className="mt-1.5 whitespace-pre-line text-sm text-gray-900">{note}</p>
+            {onAskAgain && (
+              <button onClick={onAskAgain} className="mt-2 rounded-full bg-violet-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-800">
+                Zapytaj ponownie
+              </button>
+            )}
           </div>
         )}
         <div className="space-y-1.5">

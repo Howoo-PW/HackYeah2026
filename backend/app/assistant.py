@@ -22,6 +22,8 @@ from .config import settings
 from .errors import AppError
 from .geocoding import Found, Geocoder, get_geocoder
 from .repository import time_of_day as current_time_of_day
+from .assistant_river import BankPoint, pick_river_vias
+from .embeddings import vector_literal
 from .routing.geo import in_krakow
 from .routing.graph import PostgresGraphSource, graph_routes
 from .routing.schemas import Point, RouteOut, Scores, Weights
@@ -31,6 +33,10 @@ log = logging.getLogger("assistant")
 ASSISTANT_LIMIT_PER_MINUTE = 10  # per IP: every request costs two model calls
 AI_TIMEOUT_S = 20  # plan and answer are separate calls, each below the AI service's own 12 s limit
 MAX_FACTS = 40
+MIN_SIMILARITY = 0.25  # cosine similarity between the description and a comment below which the comment does not count
+DETOUR_LIMIT = 1.2  # a route through bank points may be this much longer than the plain one ...
+DETOUR_SLACK_M = 250  # ... plus this many metres
+VIA_MAX_SNAP_M = 150  # a waypoint farther than this from a road of the profile would only cause a detour: it is skipped
 HINT = "Opisz trasę (np. „rowerem z Rynku Głównego na Wawel, ładne widoki”), miejsce (np. „pokaż Lokum Salsa”) albo kryterium (np. „najlepsza nawierzchnia na Podgórzu”)."
 
 RouteRunner = Callable[[str, Point, Point, Weights, list[Point], str], Awaitable[list[RouteOut]]]
@@ -102,11 +108,13 @@ class AiPlan(BaseModel):
     from_place: str | None = None
     to_place: str | None = None
     via_places: list[str] = Field(default_factory=list)
+    along_river: bool = False
     profile: Literal["driving-car", "cycling-regular", "foot-walking"] = "driving-car"
     weights: dict[str, int] = Field(default_factory=dict)
     place_query: str | None = None
     area: str | None = None
     dimension: Literal["surface", "views", "safety", "traffic", "parking"] | None = None
+    topic: str | None = None
     want: Literal["best", "worst"] = "best"
     count: int = Field(default=3, ge=1, le=5)
     model: str = ""
@@ -130,6 +138,14 @@ class AiClient:
         except ValidationError:
             raise AppError(502, "AI_UNAVAILABLE", "Asystent AI zwrócił nieczytelną odpowiedź") from None
 
+    async def embed(self, text: str) -> list[float]:
+        """The description's vector (same model as the stored comments)."""
+        out = await self._post("/embed", {"texts": [text]})
+        try:
+            return [float(v) for v in out["vectors"][0]]
+        except (KeyError, IndexError, TypeError, ValueError):
+            raise AppError(502, "AI_UNAVAILABLE", "Asystent AI zwrócił nieczytelną odpowiedź") from None
+
     async def answer(self, query: str, intent: str, fact_lines: list[str]) -> tuple[str, str]:
         out = await self._post("/assistant/answer", {"query": query, "intent": intent, "facts": [f[:700] for f in fact_lines[:MAX_FACTS]], "language": "pl"})
         return str(out["answer"]), str(out.get("model", ""))
@@ -141,6 +157,8 @@ class Deps:
     geo: Geocoder
     data: AssistantData
     routes: RouteRunner
+    # Distance in metres from a point to the nearest road of the profile (None: no such road). Unset: waypoints are not checked.
+    snap_distance: Callable[[str, float, float], Awaitable[float | None]] | None = None
 
 
 # ---- running a plan ----------------------------------------------------------------------------------------------------
@@ -180,24 +198,67 @@ async def do_route(plan: AiPlan, query: str, d: Deps) -> AssistantResponse:
     if not plan.from_place or not plan.to_place:
         return clarify(plan, "Podaj, skąd i dokąd chcesz jechać. " + HINT)
     wanted = [plan.from_place, *plan.via_places[:3], plan.to_place]
+    last = len(wanted) - 1
     places: list[Found] = []
-    for text in wanted:
+    for i, text in enumerate(wanted):
         found = await d.geo.find(text)
+        if found is None:
+            found = await d.geo.find(f"{text}, Kraków")
         if found is None or not in_krakow(found.lat, found.lon):
+            if 0 < i < last:  # a waypoint the model suggested (e.g. a riverside street) is optional: skip it
+                log.info("assistant: via point %r not found, skipped", text)
+                continue
             return clarify(plan, f"Nie znalazłem w Krakowie miejsca „{text}”. Spróbuj podać dokładniejszą nazwę lub ulicę.")
+        if 0 < i < last and d.snap_distance is not None:
+            away = await d.snap_distance(plan.profile, found.lat, found.lon)
+            if away is None or away > VIA_MAX_SNAP_M:  # e.g. an embankment path for a car: the route would detour to reach it
+                log.info("assistant: via point %r is %s m from a road for %s, skipped", text, away, plan.profile)
+                continue
         places.append(found)
 
     weights = Weights(**{k: v for k, v in plan.weights.items() if k in ("surface", "views", "safety", "traffic")})
     tod = current_time_of_day(datetime.now(timezone.utc)).value
     point = lambda f: Point(lat=f.lat, lon=f.lon)  # noqa: E731
+    start, end = places[0], places[-1]
+
+    def order(stops: list[Found]) -> list[Found]:
+        """Waypoints in driving order from start to end (the user's own order is kept unless bank points are mixed in)."""
+        if not plan.along_river:
+            return stops
+        return sorted(stops, key=lambda f: (f.lat - start.lat) * (end.lat - start.lat) + (f.lon - start.lon) * (end.lon - start.lon))
+
+    async def run_route(stops: list[Found]) -> list[RouteOut]:
+        return await d.routes(plan.profile, point(start), point(end), weights, [point(p) for p in order(stops)], tod)
+
+    named_stops = places[1:-1]
     try:
-        routes = await d.routes(plan.profile, point(places[0]), point(places[-1]), weights, [point(p) for p in places[1:-1]], tod)
+        routes = await run_route(named_stops)
     except AppError as exc:
         return clarify(plan, route_error_text(exc, [p.name for p in places]))
+    stops = named_stops
+
+    if plan.along_river:
+        # Waypoints on the bank come from the embankment paths in the database. A bank point that is near on the map can still
+        # force the route to double back (a river between, a one-way street), so a version with them is kept only when it is
+        # not much longer than the plain route; otherwise fewer points are tried, and in the end none.
+        bank = [BankPoint(*row) for row in await run_in_threadpool(d.data.river_points)]
+        snap = (lambda lat, lon: d.snap_distance(plan.profile, lat, lon)) if d.snap_distance else None
+        river = [Found(v.name, v.lat, v.lon) for v in await pick_river_vias((start.lat, start.lon), (end.lat, end.lon), bank, snap)]
+        limit = routes[0].distance_m * DETOUR_LIMIT + DETOUR_SLACK_M
+        for subset in ([river] if len(river) > 1 else []) + [[v] for v in river]:
+            try:
+                tried = await run_route([*named_stops, *subset])
+            except AppError:
+                continue
+            if tried[0].distance_m <= limit:
+                routes, stops = tried, [*named_stops, *subset]
+                break
+
+    places = [start, *order(stops), end]
 
     main = routes[0]
     fastest = next((r for r in routes if r.rank == 2), None)
-    start, end, via = places[0], places[-1], places[1:-1]
+    via = places[1:-1]
     lines = facts.route_facts(main.model_dump(), fastest.model_dump() if fastest else None, plan.profile, weights.model_dump(),
                               start.name, end.name, [p.name for p in via])
     lines += await run_in_threadpool(d.data.segment_facts, main.segment_ids)
@@ -228,7 +289,42 @@ async def do_place(plan: AiPlan, query: str, d: Deps) -> AssistantResponse:
     )
 
 
+async def do_streets_by_meaning(plan: AiPlan, query: str, d: Deps) -> AssistantResponse:
+    """Streets whose comments match a description in words ("spokojna droga nad wodą"): search by meaning over the comments."""
+    bbox, outline = None, None
+    if plan.area:
+        area = await d.geo.find(plan.area, area=True)
+        if area is None:
+            return clarify(plan, f"Nie znalazłem w Krakowie okolicy „{plan.area}”.")
+        pad = 0.012
+        bbox = area.bbox or (area.lon - pad, area.lat - pad * 0.7, area.lon + pad, area.lat + pad * 0.7)
+        outline = area.outline
+    vector = await d.ai.embed(plan.topic)
+    rows = await run_in_threadpool(d.data.comments_by_meaning, vector_literal(vector), bbox, outline, plan.count, MIN_SIMILARITY)
+    where = f" w okolicy „{plan.area}”" if plan.area else ""
+    if not rows:
+        return clarify(plan, f"Nie znalazłem komentarzy pasujących do opisu „{plan.topic}”{where}. Spróbuj opisać to inaczej.")
+
+    streets, lines = [], [f"Szukano ulic{where} pasujących do opisu „{plan.topic}” według komentarzy użytkowników."]
+    for row in rows:
+        ids = await run_in_threadpool(d.data.group_segment_ids, row["group_id"])
+        scores = {k: row[k] for k in facts.DIMENSIONS}
+        present = [v for v in scores.values() if v is not None]
+        streets.append(AssistantStreet(
+            name=row["name"], group_id=row["group_id"], highway=row["highway"], length_m=row["length_m"],
+            location=NamedPoint(name=row["name"], lat=row["lat"], lon=row["lon"]), segment_ids=ids,
+            scores=Scores(**scores), ratings_count=row["ratings"], score=round(sum(present) / len(present), 2) if present else None,
+        ))
+        lines.append(facts.street_fact({**scores, "name": row["name"], "length_m": row["length_m"], "ratings": row["ratings"]}, on_route=False))
+        lines += [f"Komentarz o ulicy {row['name']}: „{facts.clean(text)}”" for text in row["texts"]]
+    lines += await run_in_threadpool(d.data.segment_facts, streets[0].segment_ids, False)
+    answer, model = await write_answer(d, query, "streets", lines)
+    return AssistantResponse(intent="streets", interpretation=plan.restated, answer=answer, model=model or plan.model, streets=streets)
+
+
 async def do_streets(plan: AiPlan, query: str, d: Deps) -> AssistantResponse:
+    if plan.dimension is None and plan.topic:
+        return await do_streets_by_meaning(plan, query, d)
     if plan.dimension is None:
         return clarify(plan, "Według jakiego kryterium mam szukać: nawierzchni, widoków, bezpieczeństwa czy ruchu? " + HINT)
     bbox, outline = None, None
@@ -285,7 +381,11 @@ def get_deps(request: Request, geo: Geocoder = Depends(get_geocoder)) -> Deps:
     async def run_routes(profile, start, end, weights, via, tod):
         return await run_in_threadpool(graph_routes, source, profile, start, end, weights, via, tod)
 
-    return Deps(ai=AiClient(), geo=geo, data=AssistantData(pool), routes=run_routes)
+    async def snap_distance(profile, lat, lon):
+        snap = await run_in_threadpool(source.snap, profile, Point(lat=lat, lon=lon))
+        return None if snap is None else snap.distance_m
+
+    return Deps(ai=AiClient(), geo=geo, data=AssistantData(pool), routes=run_routes, snap_distance=snap_distance)
 
 
 @router.post("/assistant", response_model=AssistantResponse)
