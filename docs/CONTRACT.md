@@ -391,12 +391,11 @@ Odpowiedź: `201`, `Photo`.
 - `via`: opcjonalne, do 5 punktów pośrednich; trasa przechodzi przez nie w podanej kolejności (od `from` do `to`).
   Brak = `[]`. Każdy punkt musi leżeć w obsługiwanym obszarze, tak jak `from` i `to` (sekcja 2): inaczej
   `422 OUT_OF_AREA` z `details.field` = `"via[0]"`, `"via[1]"`, …
-  Piesi (`foot-walking`) dostają przy `via` jedną trasę zamiast kilku alternatyw.
-- `profile`: `driving-car` / `cycling-regular` / `foot-walking`.
+- `profile`: `driving-car` / `cycling-regular` / `foot-walking`. Pieszy chodzi po drogach (nie po chodnikach), w obie strony.
 - `weights`: 0–3 dla każdego wymiaru, brakujący = 0. Wszystkie 0 → sortowanie po czasie przejazdu.
-- Auto i rower: bez wag jedna trasa (najszybsza). Z wagami `rank: 1` to trasa najlepsza dla tych priorytetów, a `rank: 2`
-  najszybsza (pomijana, gdy to ta sama trasa). Punkt dalej niż 600 m od drogi danego profilu → `404 NOT_FOUND`
-  z `details.field` (`"from"`, `"via[i]"` lub `"to"`).
+- Wszystkie profile: bez wag jedna trasa (najszybsza). Z wagami `rank: 1` to trasa najlepsza dla tych priorytetów, a
+  `rank: 2` najszybsza (pomijana, gdy to ta sama trasa). Punkt dalej niż 600 m od drogi danego profilu →
+  `404 NOT_FOUND` z `details.field` (`"from"`, `"via[i]"` lub `"to"`).
 
 ```json
 {
