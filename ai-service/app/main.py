@@ -5,9 +5,11 @@ import secrets
 
 from fastapi import Depends, FastAPI, Header
 
+from .assistant_mock import mock_answer, mock_plan
+from .assistant_schemas import AnswerOut, AnswerRequest, AssistantRequest, EmbedOut, EmbedRequest, PlanOut
 from .config import settings
 from .errors import AppError, install_error_handlers
-from .mock import MOCK_MODEL, MOCK_SUMMARY, MOCK_SURFACE
+from .mock import MOCK_MODEL, MOCK_SUMMARY, MOCK_SURFACE, mock_embedding
 from .schemas import SummarizeRequest, SummaryOut, SurfaceOut, SurfaceRequest
 
 log = logging.getLogger("ai")
@@ -58,3 +60,30 @@ async def analyze_surface(req: SurfaceRequest) -> SurfaceOut:
     if settings.mock_ai:
         return MOCK_SURFACE
     return await _call_llm("analyze_surface", req)
+
+
+@app.post("/assistant/plan", response_model=PlanOut, dependencies=[Depends(require_internal_key)])
+async def assistant_plan(req: AssistantRequest) -> PlanOut:
+    """A request in words ("rowerem z Rynku na Wawel, ładne widoki") as a plan the backend can execute."""
+    if settings.mock_ai:
+        plan, model = mock_plan(req.query), MOCK_MODEL
+    else:
+        plan, model = await _call_llm("plan", req), settings.ai_model
+    return PlanOut(**plan.model_dump(), model=model)
+
+
+@app.post("/assistant/answer", response_model=AnswerOut, dependencies=[Depends(require_internal_key)])
+async def assistant_answer(req: AnswerRequest) -> AnswerOut:
+    """The reply to the user, written only from the facts the backend collected (ratings, comments, obstacles)."""
+    if settings.mock_ai:
+        return AnswerOut(answer=mock_answer(req), model=MOCK_MODEL)
+    content = await _call_llm("answer", req)
+    return AnswerOut(**content.model_dump(), model=settings.ai_model)
+
+
+@app.post("/embed", response_model=EmbedOut, dependencies=[Depends(require_internal_key)])
+async def embed(req: EmbedRequest) -> EmbedOut:
+    """Vectors for comments and search descriptions (1536 numbers each), for finding comments by meaning."""
+    if settings.mock_ai:
+        return EmbedOut(vectors=[mock_embedding(t) for t in req.texts], model=MOCK_MODEL)
+    return EmbedOut(vectors=await _call_llm("embed", req.texts), model=settings.ai_embedding_model)

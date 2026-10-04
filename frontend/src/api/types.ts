@@ -232,3 +232,33 @@ export type Photo = {
   taken_at: string | null
   created_at: string
 }
+
+/** A named point in an assistant answer. */
+export type AssistantPoint = { name: string; lat: number; lon: number }
+
+/** A rated fragment of a street the assistant found by a criterion. */
+export type AssistantStreet = {
+  name: string
+  group_id: number
+  highway: string | null
+  length_m: number
+  location: AssistantPoint
+  segment_ids: number[]
+  scores: Scores
+  ratings_count: number
+  score: number | null
+}
+
+/**
+ * POST /assistant (docs/ASSISTANT.md): a request in words became a route (with the routes, as POST /route returns them),
+ * a place, a list of streets, or only a message (`clarify`). `answer` is written from ratings, comments and obstacles.
+ */
+export type AssistantResponse = {
+  intent: 'route' | 'place' | 'streets' | 'clarify'
+  interpretation: string
+  answer: string
+  model: string
+  route: { from: AssistantPoint; to: AssistantPoint; via: AssistantPoint[]; profile: RouteProfile; weights: RouteWeights; routes: RouteResult[] } | null
+  place: { name: string; lat: number; lon: number; segment_id: number | null } | null
+  streets: AssistantStreet[]
+}

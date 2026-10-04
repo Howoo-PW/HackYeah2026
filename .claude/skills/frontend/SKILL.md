@@ -63,6 +63,12 @@ Endpointy (CONTRACT.md 5.5, 5.9; wpływ na trasy: docs/ROUTING_GRAPH.md, sekcja 
    zawiera listy przeszkód na trasie (kontrakt jej nie ma), więc do pokazania przeszkód przy trasie użyj
    `GET /obstacles` dla jej obszaru.
 
+## Asystent AI
+
+Przycisk „Asystent AI” (lewy panel) otwiera `AssistantPanel`: opis słowami → `POST /assistant` (docs/ASSISTANT.md). Trasa trafia do planera przez
+`route.load` + `plan.adopt` (odpowiedź asystenta jako notatka w `RoutePanel`), miejsce na kartę miejsca, ulice jako numerowane pinezki (`pins` w `MapView`)
+i podświetlenie odcinków. Odpowiedź ma kilka sekund opóźnienia: pokazuj stan ładowania; błędy 429/502 mają polskie komunikaty.
+
 ## Stan
 
 - origin/frontend/map scalono: mapa, filtry i panel działają na localhost:5173.

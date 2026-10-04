@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchSegmentDetail, fetchStreetIds } from './api/client'
 import type { SegmentFilter } from './api/client'
-import type { Place } from './api/types'
+import type { AssistantPoint, AssistantResponse, AssistantStreet, Place } from './api/types'
 import { useAuth } from './auth/useAuth'
 import { useMyOpinions } from './auth/useMyOpinions'
 import AccountButton from './auth/AccountButton'
+import AssistantPanel from './components/AssistantPanel'
 import FilterBar from './components/FilterBar'
 import BasemapSwitch from './components/BasemapSwitch'
 import Legend from './components/Legend'
@@ -29,6 +30,12 @@ export default function App() {
   const [dimension, setDimension] = useState<Metric>('overall')
   const [filter, setFilter] = useState<SegmentFilter>({ dimension: null, minScore: null, noObstacles: false })
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  /** Streets found by the assistant (numbered pins, highlighted when zoomed in) and its reply for a route it opened. */
+  const [aiStreets, setAiStreets] = useState<AssistantStreet[]>([])
+  const [assistantNote, setAssistantNote] = useState<string | null>(null)
+  /** The last question typed to the assistant, offered again by "Zapytaj ponownie". */
+  const [assistantQuery, setAssistantQuery] = useState('')
   /** "Tylko moje oceny": limits the map to the signed-in user's own roads (and their fragments). */
   const [mineOnly, setMineOnly] = useState(false)
   const { user } = useAuth()
@@ -92,12 +99,14 @@ export default function App() {
   }
 
   const showPlace = (p: Place) => {
+    setAiStreets([])
     setPlace(p)
     setFocus({ place: p })
     select(null)
   }
 
   const startRoute = (destination?: Place) => {
+    setAssistantNote(null)
     plan.clear()
     route.start(destination)
     select(null)
@@ -105,7 +114,53 @@ export default function App() {
     if (destination) setFocus({ place: destination })
   }
 
+  /** Shows what the assistant found: a route in the planner, a place on the map, or numbered streets. */
+  const applyAssistant = (res: AssistantResponse) => {
+    const asPlace = (p: AssistantPoint): Place => ({ lat: p.lat, lon: p.lon, name: p.name, detail: null, bounds: null })
+    setAiStreets([])
+    if (res.intent === 'route' && res.route) {
+      const r = res.route
+      const draft = route.load({ a: asPlace(r.from), b: asPlace(r.to), stops: r.via.map(asPlace), profile: r.profile, weights: r.weights })
+      plan.adopt(draft, r.routes)
+      select(null)
+      setPlace(null)
+      setAssistantNote(res.answer)
+      setAssistantOpen(false)
+      setRouting(true)
+    } else if (res.intent === 'place' && res.place) {
+      showPlace({ ...asPlace(res.place), kind: 'place', segmentId: res.place.segment_id ?? undefined })
+    } else if (res.intent === 'streets' && res.streets.length > 0) {
+      setPlace(null)
+      select(null)
+      setAiStreets(res.streets)
+      const lons = res.streets.map((st) => st.location.lon)
+      const lats = res.streets.map((st) => st.location.lat)
+      const [w, e, so, n] = [Math.min(...lons), Math.max(...lons), Math.min(...lats), Math.max(...lats)]
+      const pad = 0.003
+      setFocus({ place: { lat: (so + n) / 2, lon: (w + e) / 2, name: '', detail: null, bounds: [w - pad, so - pad, e + pad, n + pad] } })
+    }
+  }
+
+  /** Opens one of the assistant's streets: its panel, centred on the map. */
+  const openAiStreet = (street: AssistantStreet) => {
+    if (street.segment_ids.length > 0) select(street.segment_ids[0])
+    setFocus({ place: { lat: street.location.lat, lon: street.location.lon, name: street.name, detail: null, bounds: null } })
+  }
+
+  /** Back from a route the assistant made to its question box (the route is dropped, the question stays). */
+  const askAssistantAgain = () => {
+    leaveRoute()
+    setAssistantOpen(true)
+  }
+
+  /** Closes the assistant and takes its numbered pins off the map. */
+  const closeAssistant = () => {
+    setAssistantOpen(false)
+    setAiStreets([])
+  }
+
   const leaveRoute = () => {
+    setAssistantNote(null)
     plan.clear()
     route.reset()
     setRouting(false)
@@ -119,11 +174,20 @@ export default function App() {
         dimension={dimension}
         filter={filter}
         only={only}
-        selectedIds={street && street.forId === selectedId ? street.ids : groupIds.length > 0 ? groupIds : selectedId !== null ? [selectedId] : []}
+        selectedIds={
+          street && street.forId === selectedId
+            ? street.ids
+            : groupIds.length > 0
+              ? groupIds
+              : selectedId !== null
+                ? [selectedId]
+                : aiStreets.flatMap((st) => st.segment_ids)
+        }
         primaryId={selectedId}
         onSelect={select}
         focus={focus}
         placeMarker={place}
+        pins={aiStreets.map((st, i) => ({ lat: st.location.lat, lon: st.location.lon, label: String(i + 1) }))}
         routeMode={routing}
         routePoints={{ a: route.draft.a, b: route.draft.b, stops: route.draft.stops }}
         placing={activePoint(route.draft) !== null}
@@ -134,7 +198,7 @@ export default function App() {
 
       <div className="pointer-events-none absolute left-0 top-0 flex w-[calc(100%-6.5rem)] max-w-md flex-col gap-2 p-3 md:w-full">
         {routing ? (
-          <RoutePanel route={route} plan={plan} onBack={leaveRoute} />
+          <RoutePanel route={route} plan={plan} note={assistantNote} onDismissNote={() => setAssistantNote(null)} onAskAgain={askAssistantAgain} onBack={leaveRoute} />
         ) : (
           <>
             <div className="pointer-events-auto">
@@ -157,7 +221,10 @@ export default function App() {
 
             <div className="pointer-events-auto flex gap-2">
               <button
-                onClick={() => setFiltersOpen((o) => !o)}
+                onClick={() => {
+                  setFiltersOpen((o) => !o)
+                  closeAssistant()
+                }}
                 aria-expanded={filtersOpen}
                 className="flex-1 rounded-full bg-white px-4 py-2 text-sm font-medium shadow-lg ring-1 ring-black/5 transition hover:bg-gray-50"
               >
@@ -169,7 +236,21 @@ export default function App() {
               >
                 Trasa
               </button>
+              <button
+                onClick={() => {
+                  if (assistantOpen) closeAssistant()
+                  else setAssistantOpen(true)
+                  setFiltersOpen(false)
+                }}
+                aria-expanded={assistantOpen}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-violet-700 px-4 py-2 text-sm font-medium text-white shadow-lg transition hover:bg-violet-800"
+              >
+                Asystent
+                <span className="rounded bg-white/25 px-1 text-[10px] font-bold uppercase">AI</span>
+              </button>
             </div>
+
+            {assistantOpen && <AssistantPanel initialQuery={assistantQuery} onQuery={setAssistantQuery} onResult={applyAssistant} onOpenStreet={openAiStreet} onClose={closeAssistant} />}
 
             {filtersOpen && (
               <FilterBar
