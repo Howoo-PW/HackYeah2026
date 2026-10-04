@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 Profile = Literal["driving-car", "cycling-regular", "foot-walking"]
+TimeOfDay = Literal["morning", "day", "evening", "night"]  # docs/CONTRACT.md, section 3
 DIMENSIONS = ("surface", "views", "safety", "traffic", "parking")
 
 
@@ -30,6 +31,7 @@ class RouteRequest(BaseModel):
     via: list[Point] = Field(default_factory=list, max_length=MAX_VIA)  # stops between from and to, in order
     profile: Profile = "driving-car"
     weights: Weights = Weights()
+    time_of_day: TimeOfDay | None = None  # None: the server's current time of day (Europe/Warsaw)
 
 
 class Scores(BaseModel):

@@ -44,6 +44,10 @@ nie przekazuj go do frontendu. Nie ma lokalnej bazy ani produkcyjnych mocków co
   Szczegóły i definicje pól: [docs/ROUTING_GRAPH.md](../docs/ROUTING_GRAPH.md). Piesi chodzą po drogach (nie po chodnikach).
   Zewnętrznego silnika tras (ORS) i mocka już nie ma; zmienne `ROUTING_PROVIDER` i `ORS_API_KEY` są nieużywane.
 - Opcjonalne `via` (do 5 punktów pośrednich, w kolejności) działa dla wszystkich profili.
+- Opcjonalne `time_of_day` (`morning|day|evening|night`, domyślnie aktualna pora w Warszawie): trasa i pokazane oceny
+  liczą oceny z tej pory (zmieszane z ocenami ogólnymi).
+- Przeszkody (`app/obstacles.py`): `GET /obstacles?bbox=`, `POST /obstacles` (10/h), `DELETE /admin/obstacles/{id}`.
+  Aktywne przeszkody zmieniają trasy auta, roweru i pieszych na żywo (zamknięcie blokuje krawędź, reszta wydłuża czas).
 - Limit 30 żądań/min na IP; punkt poza obsługiwanym obszarem 422; punkt dalej niż 600 m od drogi 404.
 - Testy: `tests/test_graph_routing.py` (offline) i `tests/test_graph_db.py` (opcjonalnie, `RUN_DB_TESTS=1`,
   prawdziwa baza, tylko odczyty).

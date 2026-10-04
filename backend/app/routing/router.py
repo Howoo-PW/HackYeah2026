@@ -3,10 +3,13 @@
 For the user's priorities (weights) the best route comes first, followed by the fastest one when it differs.
 """
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 
 from ..errors import AppError
+from ..repository import time_of_day as current_time_of_day
 from .geo import in_krakow
 from .graph import GraphSource, PostgresGraphSource, graph_routes
 from .schemas import RouteRequest, RouteResponse
@@ -32,5 +35,8 @@ async def route(req: RouteRequest, request: Request, graph: GraphSource = Depend
         if not in_krakow(point.lat, point.lon):
             raise AppError(422, "OUT_OF_AREA", "Point is outside the service area", {"field": name})
 
-    routes = await run_in_threadpool(graph_routes, graph, req.profile, req.from_, req.to, req.weights, req.via)
+    # Not given: the current time of day in Warsaw, the same rule as for new ratings (docs/CONTRACT.md, section 5.3).
+    time_of_day = req.time_of_day or current_time_of_day(datetime.now(timezone.utc)).value
+    routes = await run_in_threadpool(
+        graph_routes, graph, req.profile, req.from_, req.to, req.weights, req.via, time_of_day)
     return RouteResponse(routes=routes)

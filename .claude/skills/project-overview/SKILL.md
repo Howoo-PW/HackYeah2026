@@ -56,13 +56,14 @@ Stan opisuje bieżący branch; nie oznaczaj cudzych zmian jako scalonych.
 
 ## TODO
 
-- Przeszkody i pora dnia w koszcie grafu; piesi faza 2 (ścieżki w parkach) tylko w razie potrzeby;
+- Piesi faza 2 (ścieżki w parkach) tylko w razie potrzeby; parkingi przy celu i trasy alternatywne w grafie;
+  przeszkody i pora dnia w trasach są gotowe (backend/obstacles-time-of-day);
   frontend/routing: wybór A→B, suwaki wag, lokalizacja użytkownika jako start (FE); instrukcja
   podłączenia dla FE jest w skillu frontend, sekcja „Trasy: co podłączyć”.
 - backend/b1-howoo: sekrety DB/service_role i test rzeczywistego JWT/zapisów odroczone
   na prośbę użytkownika. Kontenery demo działają; DB health=503 bez konfiguracji.
 - db/seed-krakow (B2): seed Krakowa i weryfikacja harmonogramu segment_stats.
-- backend/photos, backend/obstacles-parking (B2): moduły dodatkowe i Storage.
+- backend/photos, parkingi (B2): zdjęcia i Storage, GET /parking. Przeszkody gotowe.
 - backend/ai-integration (AI): cache; routing mock wymienić na rzeczywisty provider
   i źródło segmentów PostGIS. Integracja serwisu AI/routingu poza zakresem B1.
 - frontend/* (FE): mapa, Auth/formularze i PWA na branchach FE.

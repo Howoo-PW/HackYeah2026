@@ -13,6 +13,7 @@ from .config import settings
 from .core import router as core_router
 from .database import create_pool
 from .errors import install_error_handlers
+from .obstacles import router as obstacles_router
 from .rate_limit import RedisRateLimiter
 from .routing.router import router as routing_router
 
@@ -48,6 +49,7 @@ app.add_middleware(
 
 api = APIRouter(prefix="/api/v1")
 api.include_router(core_router)
+api.include_router(obstacles_router)
 api.include_router(routing_router)
 
 

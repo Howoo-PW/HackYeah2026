@@ -47,10 +47,13 @@ class GraphSource(Protocol):
         """Nearest node of the profile's road network and its distance (None: no network)."""
         ...
 
-    def find(self, profile: str, legs: list[tuple[Point, Point]], variants: list[Weights]) -> list[list[EdgeStep]]:
+    def find(self, profile: str, legs: list[tuple[Point, Point]], variants: list[Weights],
+             time_of_day: str | None = None) -> list[list[EdgeStep]]:
         """One route per entry of `variants`, cheapest for those weights, driving all `legs` in order.
 
-        A variant that has no route (any leg unreachable) comes back as an empty list.
+        `time_of_day` (morning, day, evening, night) selects the ratings of that time of day (blended with the
+        all-day ones); None means all-day scores. A variant that has no route (any leg unreachable) comes back
+        as an empty list.
         """
         ...
 
@@ -58,12 +61,13 @@ class GraphSource(Protocol):
 _FIND_SQL = """
 select seq, edge_id, segment_id, length_m, time_s, rated, st_asgeojson(geom, 6)::json as geometry
 from public.find_route(%(profile)s, %(from_lon)s, %(from_lat)s, %(to_lon)s, %(to_lat)s,
-  %(surface)s::integer, %(views)s::integer, %(safety)s::integer, %(traffic)s::integer, %(parking)s::integer)
+  %(surface)s::integer, %(views)s::integer, %(safety)s::integer, %(traffic)s::integer, %(parking)s::integer,
+  p_time_of_day => %(time_of_day)s::text)
 order by seq
 """
 _SCORES_SQL = """
 select segment_id, surface, views, safety, traffic, parking
-from public.segment_scores where segment_id = any(%s::integer[])
+from public.segment_scores_for_time(%s::public.time_of_day) where segment_id = any(%s::integer[])
 """
 
 
@@ -84,14 +88,16 @@ class PostgresGraphSource:
                                (profile, point.lon, point.lat)).fetchone()
         return Snap(int(row["node_id"]), float(row["distance_m"])) if row else None
 
-    def find(self, profile: str, legs: list[tuple[Point, Point]], variants: list[Weights]) -> list[list[EdgeStep]]:
+    def find(self, profile: str, legs: list[tuple[Point, Point]], variants: list[Weights],
+             time_of_day: str | None = None) -> list[list[EdgeStep]]:
         with self._require_pool().connection() as conn:
             found = []
             for weights in variants:
                 rows: list[dict] = []
                 for start, end in legs:
                     params = {"profile": profile, "from_lon": start.lon, "from_lat": start.lat,
-                              "to_lon": end.lon, "to_lat": end.lat, **weights.model_dump()}
+                              "to_lon": end.lon, "to_lat": end.lat, "time_of_day": time_of_day,
+                              **weights.model_dump()}
                     leg_rows = conn.execute(_FIND_SQL, params).fetchall()
                     if not leg_rows:  # a leg without a route means no route for this variant
                         rows = []
@@ -99,7 +105,8 @@ class PostgresGraphSource:
                     rows.extend(leg_rows)
                 found.append(rows)
             segment_ids = sorted({r["segment_id"] for rows in found for r in rows if r["segment_id"] is not None})
-            scores = {r["segment_id"]: r for r in conn.execute(_SCORES_SQL, (segment_ids,)).fetchall()} if segment_ids else {}
+            scores = ({r["segment_id"]: r for r in conn.execute(_SCORES_SQL, (time_of_day, segment_ids)).fetchall()}
+                      if segment_ids else {})
 
         empty = {d: None for d in DIMENSIONS}
         return [
@@ -157,12 +164,13 @@ def build_route(steps: list[EdgeStep], weights: Weights) -> RouteOut:
 
 
 def graph_routes(source: GraphSource, profile: Profile, start: Point, end: Point, weights: Weights,
-                 via: Sequence[Point] = ()) -> list[RouteOut]:
+                 via: Sequence[Point] = (), time_of_day: str | None = None) -> list[RouteOut]:
     """Routes for a car, bike or foot profile from the own graph, from `start` through the `via` stops (in order) to `end`.
 
     Without weights: the fastest route only. With weights: rank 1 is the best route for those priorities and
     rank 2 the fastest one (when it differs), so the user sees what the better route costs in time.
-    Each stretch between two stops is searched separately and the stretches are joined.
+    Each stretch between two stops is searched separately and the stretches are joined. `time_of_day` picks the
+    ratings of that time of day; active obstacles always count (closures are avoided, other obstacles slow roads).
     """
     if profile not in GRAPH_PROFILES:
         raise AppError(422, "VALIDATION_ERROR", "Profile is not served by the own graph", {"field": "profile"})
@@ -182,7 +190,7 @@ def graph_routes(source: GraphSource, profile: Profile, start: Point, end: Point
 
     fastest = Weights()
     variants = [weights, fastest] if weights != fastest else [fastest]
-    paths = source.find(profile, legs, variants)
+    paths = source.find(profile, legs, variants, time_of_day)
     if not all(paths):
         raise AppError(404, "NOT_FOUND", "No route found", {"profile": profile})
     if len(paths) == 2 and [s.edge_id for s in paths[0]] == [s.edge_id for s in paths[1]]:

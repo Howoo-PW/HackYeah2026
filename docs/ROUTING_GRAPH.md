@@ -69,14 +69,18 @@ Wszystkie trzy profile (`driving-car`, `cycling-regular`, `foot-walking`) idą z
 - Krawędź jest dopasowana do **jednego** odcinka (najbliższego jej środka), więc na długiej krawędzi obejmującej kilka
   odcinków liczy się wynik jednego z nich.
 
-**Żądanie** (pole `via` jest opcjonalne i **nie ma go jeszcze w `docs/CONTRACT.md`**, zmiana kontraktu idzie osobnym PR):
+**Żądanie** (`via` i `time_of_day` są opcjonalne; kontrakt: `docs/CONTRACT.md`, sekcja 5.8):
 
 ```json
 { "from": {"lat": 50.0668, "lon": 19.9341}, "to": {"lat": 50.0670, "lon": 19.9302},
   "via": [{"lat": 50.0654, "lon": 19.9307}],
   "profile": "driving-car",
-  "weights": {"surface": 2, "views": 0, "safety": 0, "traffic": 0, "parking": 0} }
+  "weights": {"surface": 2, "views": 0, "safety": 0, "traffic": 0, "parking": 0},
+  "time_of_day": "evening" }
 ```
+
+- `time_of_day`: `morning` | `day` | `evening` | `night`. Brak = aktualna pora dnia w Warszawie (ta sama reguła co przy
+  nowych ocenach). Patrz sekcja „Pora dnia”.
 
 - `via`: do 5 punktów pośrednich, trasa przechodzi przez nie w podanej kolejności (start → via[0] → … → koniec).
   Każdy odcinek między dwoma przystankami szuka się osobno, a wyniki skleja w jedną trasę. Przystanek, który wypada w tym
@@ -130,7 +134,9 @@ gdyby była potrzebna), schodów, przejść ze światłami jako kosztu ani obsza
 | `routing_nodes` | 78 737 węzłów, flagi `car_main`/`bike_main`/`foot_main` (największa silnie spójna składowa) |
 | `routing_edge_dims` (widok) | oceny krawędzi: oceny → priory OSM → 3 |
 | `routing_graph` (widok mat.) | wszystko do liczenia kosztu w jednej tabeli; odświeżany z ocenami co 2 min |
-| `find_route(...)` | wyszukiwanie trasy wg wag |
+| `routing_edge_obstacles` (widok) | aktywne przeszkody przypisane do najbliższej krawędzi (osobno auto, rower, piesi), liczone na żywo |
+| `blend_score(...)`, `segment_scores_for_time(pora)` | ocena odcinka dla pory dnia: oceny z tej pory zmieszane z ocenami ogólnymi |
+| `find_route(...)` | wyszukiwanie trasy wg wag, przeszkód i pory dnia |
 | `routing_snap(profil, lon, lat)` | najbliższy węzeł sieci i odległość do niego (backend odrzuca punkty > 600 m od drogi) |
 | `rebuild_routing()` | pełna przebudowa po ponownym imporcie OSM (topologia + `routing_graph`) |
 
@@ -138,6 +144,44 @@ Spójność (silna, z kierunkami): auto 96,5%, rower 96,2%, piesi 96,0% długoś
 Mapowanie ocen: krawędź bierze oceny odcinka `segments` o tym samym `osm_way_id`, najbliższego jej środka
 (32 589 krawędzi ma odcinek; reszta jedzie na priorach). Dziś ocenianych krawędzi jest 1 936 (dane demo
 wokół Rynku).
+
+## Przeszkody na trasie
+
+Zgłoszone przeszkody (`obstacles`, endpointy w `backend/app/obstacles.py`) wpływają na trasy od razu, bez
+odświeżania i bez przebudowy grafu: widok `routing_edge_obstacles` jest liczony przy każdym wyszukiwaniu.
+
+- Aktywna przeszkoda (`valid_until` puste lub w przyszłości) trafia do **najbliższej krawędzi** dostępnej dla danego
+  profilu (osobno auto, rower i piesi), nie dalej niż 50 m.
+- `closure` (zamknięcie): krawędź jest niedostępna w obu kierunkach. `accident` ×3 czasu, `roadwork` ×2,
+  `pothole` ×1,25, `other` ×1,2. Kilka przeszkód na jednej krawędzi: zamknięcie wygrywa, inaczej największy mnożnik.
+- Mnożnik wydłuża też `duration_s`, więc czas trasy zawiera opóźnienie z przeszkody. Dotyczy także trasy „najszybszej”
+  (rank 2), bo opóźnienia są prawdziwe.
+- Przeszkoda leży na jednej krawędzi, więc na długiej krawędzi (do kilkuset metrów) obejmuje całą krawędź.
+- Gdy zamknięcie odcina cel całkowicie, wynik to `404 NOT_FOUND` („No route found”).
+- Odpowiedź `POST /route` nie zawiera listy przeszkód na trasie (kontrakt nie ma pola): trasa po prostu je omija lub
+  uwzględnia opóźnienie. Do pokazania przeszkód przy trasie frontend używa `GET /obstacles`.
+
+Endpointy: `GET /obstacles?bbox=` (publiczny, tylko aktywne, do 1000), `POST /obstacles` (zalogowany, 10/h, punkt w
+obsługiwanym obszarze, `valid_until` w przyszłości lub brak; `segment_id` to najbliższy odcinek w 50 m, może być
+`null`), `DELETE /admin/obstacles/{id}` (admin, 204).
+
+## Pora dnia
+
+Oceny mają porę dnia (`morning` 6–10, `day` 10–16, `evening` 16–22, `night` 22–6, czas warszawski). Trasa liczona dla
+pory dnia używa ocen odcinków z tej pory, a nie tylko średniej z całego dnia:
+
+```
+ocena dla pory = (n * średnia_pory + K * ocena_ogólna) / (n + K)      n = liczba ocen w tej porze, K = 3
+```
+
+- Jedna nocna ocena nie przesądza o dobrze znanym odcinku (mieszanie z oceną ogólną), a odcinek, którego nikt nie
+  ocenił w tej porze (albo nikt nie ocenił danego wymiaru), zachowuje ocenę ogólną.
+- Dotyczy to zarówno kosztu trasy w `find_route(..., p_time_of_day => '...')`, jak i ocen raportowanych w odpowiedzi
+  (`scores`, `score`): backend czyta je z `segment_scores_for_time(pora)`, więc użytkownik widzi to, według czego trasa
+  została wybrana.
+- Liczba ocen `n` to wszystkie oceny odcinka w danej porze (widok `segment_stats_by_time` nie rozbija ich na wymiary),
+  więc przy rzadko ocenianym wymiarze waga pory bywa lekko zawyżona.
+- Przeszkody nie zależą od pory dnia.
 
 ## Wydajność
 
@@ -150,12 +194,16 @@ A* dał w teście inną trasę, więc nie jest używany).
 `backend/tests/test_graph_routing.py` (offline, atrapy bazy): sklejanie geometrii, średnie ważone, coverage, ranking,
 błędy, limit żądań, mapowanie wierszy z bazy. `backend/tests/test_graph_db.py` (opcjonalnie, prawdziwa baza, tylko
 odczyty): `RUN_DB_TESTS=1 python -m pytest -c backend/pytest.ini backend/tests/test_graph_db.py`.
+Przeszkody: `test_obstacles.py` (offline) i `test_obstacles_db.py` (prawdziwa baza, objazd wokół zamknięcia dla auta,
+roweru i pieszych, wygasanie). Pora dnia: `test_time_of_day_db.py` (mieszanie ocen, trasy dla każdej pory, nocne oceny
+zmieniają tylko trasę nocną). Testy zapisujące do bazy działają w transakcji wycofywanej na końcu, więc nic w niej
+nie zostaje (są wolne: kilkadziesiąt sekund).
 
 ## Czego graf jeszcze nie robi
 
 - zakazy skrętu (relacje `restriction`) i bariery; kierunki ruchu są uwzględnione,
 - przeszkody (`obstacles`): zamknięcie powinno wyłączać krawędź, remont dodawać karę,
-- pora dnia (`segment_stats_by_time`), parkingi przy celu, trasy alternatywne,
+- parkingi przy celu, trasy alternatywne,
 - sieć dla pieszych poza drogami: chodniki, przejścia, schody, ścieżki w parkach.
 
 ## Utrzymanie

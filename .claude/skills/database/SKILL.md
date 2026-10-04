@@ -32,9 +32,13 @@ Stan i TODO tutaj oraz w overview i dziennik B2. Nie edytuj kontraktu przy okazj
   Auto 96,5%, rower 96,2% w największej silnie spójnej składowej. `routing_snap` (2026-10-05):
   najbliższy węzeł i odległość, używane przez backend do odrzucania punktów > 600 m od drogi.
 
+- 2026-10-04: widok `routing_edge_obstacles` (aktywne przeszkody → najbliższa krawędź auta/roweru/pieszych, na żywo),
+  `blend_score` i `segment_scores_for_time` (oceny wg pory dnia zmieszane z ogólnymi), `routing_graph` z `segment_id`,
+  `find_route` z parametrem `p_time_of_day`.
+
 ## TODO
 
-- Graf: przeszkody w koszcie, pora dnia, parkingi przy celu, trasy alternatywne; integracja
+- Graf: parkingi przy celu i trasy alternatywne (przeszkody i pora dnia już są); integracja
   `POST /route` z `find_route` (backend, AI/B1). Po reimporcie OSM: `select * from rebuild_routing();`.
 - db/schema: migracje scalone; dalsza weryfikacja uprawnień i harmonogramów u B2.
 - db/seed-krakow: import OSM, podział odcinków <=300 m, parkingi i dane demo.

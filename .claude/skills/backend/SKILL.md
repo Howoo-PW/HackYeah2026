@@ -24,6 +24,8 @@ Najpierw project-overview i docs/CONTRACT.md. API /api/v1; OpenAPI /docs.
 - app/routing/: `router.py` POST /route (limit 30/min na IP); `graph.py` auto i rower z własnego
   grafu w bazie (`find_route`, `routing_snap`, wagi użytkownika; opis w docs/ROUTING_GRAPH.md);
   `scoring.py` ogólny wynik trasy wg wag. Auto, rower i piesi z jednego grafu (ORS i mock usunięte).
+- app/obstacles.py (B2): GET /obstacles, POST /obstacles (10/h), DELETE /admin/obstacles/{id}; własne
+  `ObstacleRepository` i zależność `get_obstacle_repository`; aktywne przeszkody zmieniają trasy w grafie.
 
 Wstawiaj routery B2/AI obok core_router; nie kopiuj ich implementacji.
 Ocena: unique(user_id,segment_id,rated_on); advisory lock i UPSERT w jednej
@@ -57,10 +59,13 @@ Dokumentacja: Context7, oficjalne Supabase/FastAPI/Psycopg/PyJWT.
 - 2026-10-04, backend/foot-routing: `foot-walking` z grafu (po drogach), ORS, mock, przykładowe segmenty i `shapely`
   usunięte; `/health` sprawdza graf trzech profili; granice obszaru tylko w `app/geo.py`.
 
+- 2026-10-04, backend/obstacles-time-of-day: endpointy przeszkód (kontrakt 5.5, 5.9) i ich wpływ na trasy auta, roweru
+  i pieszych; pole `time_of_day` w `POST /route` (domyślnie aktualna pora w Warszawie) i oceny wg pory dnia w trasie.
+
 ## TODO
 
 - backend/b1-howoo: test pełnej integracji na .env zespołu i rzeczywistym JWT.
 - Piesi: faza 2 tylko gdyby brakowało ścieżek w parkach lub chodników (samodzielne `footway`, schody, przejścia).
-- Przeszkody, pora dnia i parkingi przy celu w koszcie grafu (B2); `score` bywa null: osobny PR do kontraktu.
+- Parkingi przy celu i trasy alternatywne w grafie (B2); `score` bywa null: osobny PR do kontraktu.
 - Współdzielony limiter gotowy; produkcja wymaga chronionego dostępu do Redis.
 - B2: schemat/seed i odświeżanie segment_stats; B2/AI routery dodają właściciele.
