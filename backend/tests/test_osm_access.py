@@ -1,8 +1,9 @@
-"""OSM tag interpretation for car and bike routing."""
+"""OSM tag interpretation for car, bike and pedestrian routing."""
 
 import pytest
 
-from app.osm_access import BACKWARD, BOTH, FORWARD, NONE, bike_direction, car_direction, classify, parse_maxspeed
+from app.osm_access import (BACKWARD, BOTH, FORWARD, NONE, bike_direction, car_direction, classify, foot_direction,
+                            parse_maxspeed)
 
 
 def way(highway="residential", **tags):
@@ -101,9 +102,60 @@ def test_classify_car_only_and_bike_only_ways():
 
 def test_classify_drops_ways_nobody_may_use():
     assert classify(way("steps")) is None
-    assert classify(way("footway")) is None
+    assert classify(way("footway", footway="sidewalk")) is None  # sidewalks are not modelled
+    assert classify(way("footway", footway="crossing")) is None
     assert classify(way(access="no", highway="service")) is None
     assert classify(way("service", service="parking_aisle")) is None
+
+
+# --- pedestrians ---------------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("tags", [
+    way(), way("primary"), way("secondary_link"), way("tertiary"), way("unclassified"), way("living_street"),
+    way("service"), way("pedestrian"), way("path"), way("track"), way("footway"),
+    way(oneway="yes"), way(oneway="-1"), way(junction="roundabout"), way("primary", oneway="yes"),  # one-way: not for walkers
+    way("footway", footway="traffic_island"), way(oneway__bicycle="yes"),
+])
+def test_pedestrians_walk_roads_in_both_directions(tags):
+    assert foot_direction(tags) == BOTH
+
+
+@pytest.mark.parametrize("tags,expected", [
+    (way(oneway__foot="yes"), FORWARD), (way(oneway__foot="-1"), BACKWARD), (way(oneway__foot="no", oneway="yes"), BOTH),
+])
+def test_explicit_foot_oneway_is_respected(tags, expected):
+    assert foot_direction(tags) == expected
+
+
+@pytest.mark.parametrize("tags", [
+    way("motorway"), way("motorway_link"), way("trunk"), way("trunk_link"), way("cycleway"), way("steps"),
+    way(foot="no"), way(foot="private"), way(access="no"), way(access="private"), way(access="customers"),
+    way("footway", footway="sidewalk"), way("footway", footway="crossing"),
+    way("service", service="parking_aisle"), way("service", service="driveway"), way("service", service="emergency_access"),
+    way("pedestrian", area="yes"), way(area="yes"),
+])
+def test_pedestrians_cannot_use(tags):
+    assert foot_direction(tags) == NONE
+
+
+def test_foot_exceptions_to_the_defaults():
+    assert foot_direction(way("cycleway", foot="designated")) == BOTH   # a bike path shared with walkers
+    assert foot_direction(way("cycleway", foot="yes")) == BOTH
+    assert foot_direction(way("trunk", foot="yes")) == BOTH
+    assert foot_direction(way(access="no", foot="yes")) == BOTH          # the specific tag beats the general one
+    assert foot_direction(way(access="yes", foot="no")) == NONE
+    assert foot_direction(way("motorway", foot="yes")) == NONE           # never
+
+
+def test_classify_gives_pedestrian_attributes():
+    street = classify(way("residential", oneway="yes", maxspeed="30"))
+    assert street["foot_dir"] == BOTH and street["foot_speed_kmh"] == 5 and street["car_dir"] == FORWARD
+    bike_path = classify(way("cycleway"))
+    assert bike_path["foot_dir"] == NONE and bike_path["foot_speed_kmh"] is None
+    alley = classify(way("footway"))  # only pedestrians: a way that cars and bikes may not use is still kept
+    assert (alley["car_dir"], alley["bike_dir"], alley["foot_dir"], alley["foot_speed_kmh"]) == (NONE, NONE, BOTH, 5)
+    motorway = classify(way("motorway"))
+    assert motorway["car_dir"] == FORWARD and motorway["foot_dir"] == NONE
 
 
 def test_default_car_speed_is_used_without_maxspeed():

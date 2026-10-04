@@ -1,8 +1,9 @@
-"""OSM tags -> routing attributes for cars and bikes (pure functions, no I/O).
+"""OSM tags -> routing attributes for cars, bikes and pedestrians (pure functions, no I/O).
 
 Used by scripts/load_osm_routing.py to fill public.osm_ways. For each way it answers, per
 profile, in which direction the way may be travelled and how fast, following the common OSM
-routing conventions (access hierarchy, oneway, roundabouts, bike contraflow). Anything this
+routing conventions (access hierarchy, oneway, roundabouts, bike contraflow; pedestrians walk
+the road network in both directions and sidewalks are not modelled). Anything this
 does not model (turn restrictions, barriers, time-based access) is left out on purpose and
 can be derived later from the raw `tags` column.
 """
@@ -20,6 +21,18 @@ BIKE_HIGHWAYS = {
 }
 # Only with an explicit bicycle=yes|designated|permissive.
 BIKE_IF_ALLOWED = {"trunk", "trunk_link", "footway", "pedestrian"}
+
+# Pedestrians are routed on the road network, not on sidewalks (a team decision): any ordinary road, pedestrian
+# street, path or track, unless tagged otherwise.
+FOOT_HIGHWAYS = {
+    "primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link", "unclassified",
+    "residential", "living_street", "service", "pedestrian", "path", "track", "footway",
+}
+# Only with an explicit foot=yes|designated|permissive (a bike path shared with pedestrians; a trunk road with a footpath).
+FOOT_IF_ALLOWED = {"cycleway", "trunk", "trunk_link"}
+# Sidewalks and crossings are not modelled: the road they belong to stands for them.
+NOT_MODELLED_FOOTWAYS = {"sidewalk", "crossing"}
+FOOT_SPEED_KMH = 5
 
 BLOCKING = {"no", "private", "customers", "delivery", "agricultural", "forestry", "military", "permit"}
 ALLOWING = {"yes", "designated", "permissive", "destination"}
@@ -98,6 +111,25 @@ def bike_direction(tags: dict) -> str:
     return direction
 
 
+def foot_direction(tags: dict) -> str:
+    """Direction a pedestrian may walk a way. One-way streets do not bind pedestrians, so it is BOTH unless
+    `oneway:foot` says otherwise; ways closed to pedestrians (foot=no, private access) and ways that are
+    sidewalks or crossings are NONE."""
+    highway = tags.get("highway")
+    foot_allowed = tags.get("foot") in ALLOWING
+    if highway not in FOOT_HIGHWAYS and not (highway in FOOT_IF_ALLOWED and foot_allowed):
+        return NONE
+    if tags.get("area") == "yes":
+        return NONE
+    if highway == "footway" and tags.get("footway") in NOT_MODELLED_FOOTWAYS:
+        return NONE
+    if highway == "service" and tags.get("service") in SKIPPED_SERVICE:
+        return NONE
+    if not _access(tags, ("foot", "access")):
+        return NONE
+    return _oneway(tags, "oneway:foot") or BOTH
+
+
 def parse_maxspeed(raw: str | None) -> int | None:
     """km/h from a maxspeed tag; conditional and symbolic values (none, signals) give None."""
     if not raw:
@@ -124,9 +156,9 @@ def _int(value) -> int | None:
 
 
 def classify(tags: dict) -> dict | None:
-    """Routing attributes of one way, or None when neither cars nor bikes may use it."""
-    car, bike = car_direction(tags), bike_direction(tags)
-    if car == NONE and bike == NONE:
+    """Routing attributes of one way, or None when no profile (car, bike, foot) may use it."""
+    car, bike, foot = car_direction(tags), bike_direction(tags), foot_direction(tags)
+    if car == NONE and bike == NONE and foot == NONE:
         return None
     highway = tags["highway"]
     maxspeed = parse_maxspeed(tags.get("maxspeed"))
@@ -139,6 +171,8 @@ def classify(tags: dict) -> dict | None:
         "bike_dir": bike,
         "car_speed_kmh": None if car == NONE else (maxspeed or CAR_SPEED[highway]),
         "bike_speed_kmh": None if bike == NONE else BIKE_SPEED.get(highway, BIKE_DEFAULT_SPEED),
+        "foot_dir": foot,
+        "foot_speed_kmh": None if foot == NONE else FOOT_SPEED_KMH,
         "maxspeed": maxspeed,
         "surface": tags.get("surface"),
         "smoothness": tags.get("smoothness"),
