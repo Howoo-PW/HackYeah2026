@@ -1,0 +1,12 @@
+# Only the main frontend sources and proxy configuration enter the build context.
+**
+!frontend/
+!frontend/**
+!jury/
+!jury/nginx.conf
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env
+frontend/.env.*
+frontend/**/*.log

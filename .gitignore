@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Prywatne paczki dla jury zawieraja .env z sekretami
+/submission/jury/
+
 # Claude Code — ustawienia osobiste
 .claude/settings.local.json
 
