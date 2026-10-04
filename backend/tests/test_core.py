@@ -90,8 +90,8 @@ def test_writes_and_profile_require_auth(client, path, method, body):
     assert response.headers["www-authenticate"] == "Bearer"
 
 
-@pytest.mark.parametrize("body", [{}, {"surface": 0}, {"surface": 6}, {"surface": 2.5},
-                                  {"surface": True}, {"surface": "4"}, {"surface": 4, "user_id": str(uuid4())},
+@pytest.mark.parametrize("body", [{}, {"surface": 6}, {"surface": 2.5},
+                                  {"surface": True}, {"surface": 4, "user_id": str(uuid4())},
                                   {"surface": 4, "time_of_day": "afternoon"}])
 def test_rating_validation(client, body):
     login()

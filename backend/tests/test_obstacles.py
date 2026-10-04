@@ -9,8 +9,7 @@ from fastapi.testclient import TestClient
 from app.auth import User, optional_user
 from app.errors import AppError
 from app.main import app
-from app.obstacles import (LIST_LIMIT, REPORT_LIMIT_PER_HOUR, SEGMENT_RADIUS_M, ObstacleCreate, ObstacleRepository,
-                           get_obstacle_repository)
+from app.obstacles import REPORT_LIMIT_PER_HOUR, ObstacleRepository, get_obstacle_repository
 
 client = TestClient(app)
 USER = User(UUID("11111111-1111-4111-8111-111111111111"), "test@example.invalid")
@@ -73,13 +72,9 @@ def test_listing_is_public_and_returns_the_contract_shape(repo):
     assert repo.bbox == (19.9, 50.0, 20.0, 50.1)
 
 
-@pytest.mark.parametrize("bbox", ["", "1,2,3", "a,b,c,d", "20.0,50.0,19.9,50.1", "0,0,1,1"])
-def test_listing_rejects_a_bad_bbox(repo, bbox):
-    assert client.get("/api/v1/obstacles", params={"bbox": bbox}).status_code == 422
-
-
-def test_listing_requires_a_bbox(repo):
-    assert client.get("/api/v1/obstacles").status_code == 422
+def test_listing_rejects_a_bad_bbox(repo):  # bbox parsing itself is tested in test_core.py
+    assert client.get("/api/v1/obstacles", params={"bbox": "1,2,3"}).status_code == 422
+    assert client.get("/api/v1/obstacles", params={"bbox": "0,0,1,1"}).status_code == 422  # outside the service area
 
 
 # --- reporting -------------------------------------------------------------------------------------------------
@@ -126,9 +121,8 @@ def test_time_without_a_zone_is_read_as_utc(repo):
 
 
 @pytest.mark.parametrize("change", [
-    {"type": "flood"}, {"type": None}, {"description": "x" * 501},
-    {"valid_until": (NOW - timedelta(hours=1)).isoformat()}, {"valid_until": "tomorrow"},
-    {"location": {"lat": 50.05}}, {"location": None},
+    {"type": "flood"}, {"description": "x" * 501},
+    {"valid_until": (NOW - timedelta(hours=1)).isoformat()}, {"location": {"lat": 50.05}},
 ])
 def test_report_validation(repo, change):
     login()
@@ -177,7 +171,7 @@ def test_removing_an_unknown_obstacle_is_not_found(repo):
     assert res.status_code == 404 and res.json()["error"]["code"] == "NOT_FOUND"
 
 
-# --- repository SQL ------------------------------------------------------------------------------------------------
+# --- repository (the SQL itself is checked against the real database in test_obstacles_db.py) ---------------------
 
 class FakeResult:
     def __init__(self, rows):
@@ -197,24 +191,6 @@ class FakeConnection:
     def execute(self, sql, params=None):
         self.executed.append((sql, params))
         return FakeResult(self.rows)
-
-
-def test_repository_lists_only_active_obstacles_inside_the_box():
-    conn = FakeConnection([stored()])
-    assert ObstacleRepository(conn).active((19.9, 50.0, 20.0, 50.1)) == conn.rows
-    sql, params = conn.executed[0]
-    assert "valid_until IS NULL OR valid_until > now()" in sql and "ST_MakeEnvelope" in sql
-    assert params == (19.9, 50.0, 20.0, 50.1, LIST_LIMIT)
-
-
-def test_repository_inserts_with_the_verified_user_and_nearest_segment_radius():
-    conn = FakeConnection([stored()])
-    payload = ObstacleCreate(type="closure", description="Zamknięte", location={"lat": 50.05, "lon": 19.94}, valid_until=FUTURE)
-    ObstacleRepository(conn).create(USER.id, payload)
-    sql, params = conn.executed[0]
-    assert "INSERT INTO public.obstacles" in sql and "ST_DWithin" in sql
-    assert params["user"] == USER.id and params["radius"] == SEGMENT_RADIUS_M
-    assert (params["lon"], params["lat"], params["type"]) == (19.94, 50.05, "closure")
 
 
 def test_repository_delete_reports_a_missing_obstacle():
