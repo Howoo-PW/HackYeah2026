@@ -35,7 +35,7 @@ export default function RoutePanel({ route, plan, onBack }: Props) {
   const active = activePoint(draft)
 
   return (
-    <section className="pointer-events-auto max-h-[calc(100dvh-6.5rem)] w-full overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-black/5">
+    <section className="pointer-events-auto max-h-[calc(100dvh-1.5rem)] w-full overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-black/5">
       <header className="flex items-center gap-2 border-b border-gray-100 px-3 py-2.5">
         <button onClick={onBack} aria-label="Wróć do mapy" className="rounded-full p-1.5 text-lg text-gray-700 hover:bg-gray-100">
           ←
@@ -123,14 +123,8 @@ export default function RoutePanel({ route, plan, onBack }: Props) {
         >
           {plan.status === 'loading' ? 'Szukam trasy…' : 'Wyznacz trasę'}
         </button>
-        {request === null && <p className="mt-1 text-center text-xs text-gray-600">Ustaw punkt początkowy i cel.</p>}
 
         <RouteResults plan={plan} />
-
-        <button onClick={route.reset} className="mt-2 text-sm text-gray-600 underline hover:text-gray-800">
-          Wyczyść wszystko
-        </button>
-
       </div>
     </section>
   )

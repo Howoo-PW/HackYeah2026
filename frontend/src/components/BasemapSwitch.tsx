@@ -5,11 +5,11 @@ const OPTIONS: { id: Basemap; label: string }[] = [
   { id: 'satellite', label: 'Satelita' },
 ]
 
-/** "Mapa / Satelita" switch in the bottom-left corner, like the layers button in Google Maps. */
+/** "Mapa / Satelita" switch in the bottom-right corner, left of the zoom buttons, like the layers button in Google Maps. */
 export default function BasemapSwitch({ basemap, onChange }: { basemap: Basemap; onChange: (b: Basemap) => void }) {
   return (
     <div
-      className="pointer-events-auto absolute bottom-6 left-3 flex rounded-full bg-white p-1 shadow-lg ring-1 ring-black/5"
+      className="pointer-events-auto absolute bottom-6 right-16 flex rounded-full bg-white p-1 shadow-lg ring-1 ring-black/5"
       role="radiogroup"
       aria-label="Rodzaj mapy"
     >
