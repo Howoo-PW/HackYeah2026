@@ -72,9 +72,9 @@ def test_listing_is_public_and_returns_the_contract_shape(repo):
     assert repo.bbox == (19.9, 50.0, 20.0, 50.1)
 
 
-@pytest.mark.parametrize("bbox", ["", "1,2,3", "a,b,c,d", "20.0,50.0,19.9,50.1", "0,0,1,1"])
-def test_listing_rejects_a_bad_bbox(repo, bbox):
-    assert client.get("/api/v1/obstacles", params={"bbox": bbox}).status_code == 422
+def test_listing_rejects_a_bad_bbox(repo):  # bbox parsing itself is tested in test_core.py
+    assert client.get("/api/v1/obstacles", params={"bbox": "1,2,3"}).status_code == 422
+    assert client.get("/api/v1/obstacles", params={"bbox": "0,0,1,1"}).status_code == 422  # outside the service area
 
 
 # --- reporting -------------------------------------------------------------------------------------------------
