@@ -5,7 +5,7 @@ Uses the views the map already uses: segment_scores (effective scores per segmen
 
 import json
 
-from . import assistant_facts as facts
+from . import facts
 
 MAX_STREETS = 4  # streets described per answer, longest first
 MAX_COMMENTS = 3

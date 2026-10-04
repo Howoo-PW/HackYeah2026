@@ -7,10 +7,11 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app import assistant, assistant_facts as facts, main
-from app.assistant import AiPlan, AssistantRequest, Deps
+from app import main
+from app.assistant import api as assistant, facts
+from app.assistant.api import AiPlan, AssistantRequest, Deps
+from app.assistant.geocoding import Found, NominatimGeocoder
 from app.errors import AppError
-from app.geocoding import Found, NominatimGeocoder
 from app.main import app
 from app.rate_limit import RateLimiter
 from app.routing.schemas import LineString, RouteOut, Scores
@@ -313,7 +314,7 @@ def test_time_and_distance_text():
 # ---- geocoder ---------------------------------------------------------------------------------------------------------
 
 def nominatim(handler, monkeypatch):
-    monkeypatch.setattr("app.geocoding.MIN_INTERVAL_S", 0)
+    monkeypatch.setattr("app.assistant.geocoding.MIN_INTERVAL_S", 0)
     return NominatimGeocoder(transport=httpx.MockTransport(handler))
 
 

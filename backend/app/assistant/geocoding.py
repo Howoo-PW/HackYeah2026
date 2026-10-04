@@ -11,8 +11,8 @@ from typing import Protocol
 
 import httpx
 
-from .errors import AppError
-from .geo import KRAKOW
+from ..errors import AppError
+from ..geo import KRAKOW
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 USER_AGENT = "RateMyRoad/0.1 (hackathon project; OSM Nominatim client)"

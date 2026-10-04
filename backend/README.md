@@ -42,7 +42,7 @@ nie przekazuj go do frontendu. Nie ma lokalnej bazy ani produkcyjnych mocków co
 - Auto, rower i piesi: własny graf w Supabase (`routing/graph.py`, SQL `find_route`), z wagami użytkownika dla
   nawierzchni, widoków, bezpieczeństwa, ruchu i parkingów. Rank 1 to trasa wg wag, rank 2 najszybsza.
   Szczegóły i definicje pól: [docs/ROUTING_GRAPH.md](../docs/ROUTING_GRAPH.md). Piesi chodzą po drogach (nie po chodnikach).
-  Zewnętrznego silnika tras (ORS) i mocka już nie ma; zmienne `ROUTING_PROVIDER` i `ORS_API_KEY` są nieużywane.
+  Zewnętrznego silnika tras (ORS) i mocka już nie ma.
 - Opcjonalne `via` (do 5 punktów pośrednich, w kolejności) działa dla wszystkich profili.
 - Opcjonalne `time_of_day` (`morning|day|evening|night`, domyślnie aktualna pora w Warszawie): trasa i pokazane oceny
   liczą oceny z tej pory (zmieszane z ocenami ogólnymi).
@@ -54,10 +54,9 @@ nie przekazuj go do frontendu. Nie ma lokalnej bazy ani produkcyjnych mocków co
 
 ## Integracja zespołu
 
-Na tym branchu jest wyłącznie core B1 oraz wspólne szkielety FE/AI z main.
 Routery B2/AI montuj obok core_router w osobnym kroku integracji.
 Zachowaj lifespan i obsługę błędów. Klucze SecretStr czytaj przez get_secret_value().
-Kontraktu nie zmieniono. Klucze ORS i dostawcy AI nie są wymagane do pracy B1.
+Klucz dostawcy AI nie jest wymagany (`MOCK_AI=true`).
 
 ## Weryfikacja
 

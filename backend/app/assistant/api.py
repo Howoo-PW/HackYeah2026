@@ -16,17 +16,17 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from . import assistant_facts as facts
-from .assistant_data import AssistantData
-from .config import settings
-from .errors import AppError
+from ..config import settings
+from ..embeddings import vector_literal
+from ..errors import AppError
+from ..repository import time_of_day as current_time_of_day
+from ..routing.geo import in_krakow
+from ..routing.graph import PostgresGraphSource, graph_routes
+from ..routing.schemas import Point, RouteOut, Scores, Weights
+from . import facts
+from .data import AssistantData
 from .geocoding import Found, Geocoder, get_geocoder
-from .repository import time_of_day as current_time_of_day
-from .assistant_river import BankPoint, pick_river_vias
-from .embeddings import vector_literal
-from .routing.geo import in_krakow
-from .routing.graph import PostgresGraphSource, graph_routes
-from .routing.schemas import Point, RouteOut, Scores, Weights
+from .river import BankPoint, pick_river_vias
 
 log = logging.getLogger("assistant")
 
