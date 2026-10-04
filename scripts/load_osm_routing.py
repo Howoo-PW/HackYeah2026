@@ -49,6 +49,7 @@ def query(bbox: str) -> str:
         "[out:json][timeout:180];(\n"
         f'  way["highway"~"^({ROADS})$"]({bbox});\n'
         f'  way["highway"~"^(footway|pedestrian)$"]["bicycle"~"^(yes|designated|permissive)$"]({bbox});\n'
+        f'  way["highway"="pedestrian"]({bbox});\n'  # pedestrian streets are roads for walkers
         ");out geom;"
     )
 
@@ -108,8 +109,8 @@ def build_rows(elements: list[dict]) -> list[dict]:
 
 
 def report(rows: list[dict]) -> None:
-    print(f"ways usable by cars or bikes: {len(rows)}")
-    for mode, key in (("car", "car_dir"), ("bike", "bike_dir")):
+    print(f"ways usable by cars, bikes or pedestrians: {len(rows)}")
+    for mode, key in (("car", "car_dir"), ("bike", "bike_dir"), ("foot", "foot_dir")):
         used = [r for r in rows if r[key] != NONE]
         dirs = collections.Counter(r[key] for r in used)
         km = sum(r["length_m"] for r in used) / 1000
@@ -121,10 +122,10 @@ def report(rows: list[dict]) -> None:
 
 
 INSERT = """
-insert into public.osm_ways (way_id, highway, name, oneway, junction, car_dir, bike_dir, car_speed_kmh,
-  bike_speed_kmh, maxspeed, surface, smoothness, lit, bridge, tunnel, layer, node_ids, geom, length_m, tags)
-values (%(way_id)s, %(highway)s, %(name)s, %(oneway)s, %(junction)s, %(car_dir)s, %(bike_dir)s, %(car_speed_kmh)s,
-  %(bike_speed_kmh)s, %(maxspeed)s, %(surface)s, %(smoothness)s, %(lit)s, %(bridge)s, %(tunnel)s, %(layer)s,
+insert into public.osm_ways (way_id, highway, name, oneway, junction, car_dir, bike_dir, foot_dir, car_speed_kmh,
+  bike_speed_kmh, foot_speed_kmh, maxspeed, surface, smoothness, lit, bridge, tunnel, layer, node_ids, geom, length_m, tags)
+values (%(way_id)s, %(highway)s, %(name)s, %(oneway)s, %(junction)s, %(car_dir)s, %(bike_dir)s, %(foot_dir)s, %(car_speed_kmh)s,
+  %(bike_speed_kmh)s, %(foot_speed_kmh)s, %(maxspeed)s, %(surface)s, %(smoothness)s, %(lit)s, %(bridge)s, %(tunnel)s, %(layer)s,
   %(node_ids)s, extensions.ST_SetSRID(extensions.ST_GeomFromText(%(wkt)s), 4326), %(length_m)s, %(tags)s::jsonb)
 """
 

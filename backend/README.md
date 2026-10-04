@@ -35,15 +35,19 @@ nie przekazuj go do frontendu. Nie ma lokalnej bazy ani produkcyjnych mocków co
 - Statystyki ocen liczone na żywo; segment_stats i jego odświeżanie pozostają u B2.
 - Moderacja komentarza usuwa cache AI odcinka. Publiczny odczyt tylko visible.
 - Health zwraca 503/down przy braku DB, 200/degraded przy niedostępnym AI/trasach.
-  `routing`: ok przy zbudowanym grafie i skonfigurowanym ORS (piesi), not_configured bez klucza ORS, error bez grafu.
+  `routing`: ok przy zbudowanym grafie auta, roweru i pieszych, not_configured bez bazy, error bez grafu.
 
 ## Trasy (`POST /api/v1/route`)
 
-- Auto i rower: własny graf w Supabase (`routing/graph.py`, SQL `find_route`), z wagami użytkownika dla
+- Auto, rower i piesi: własny graf w Supabase (`routing/graph.py`, SQL `find_route`), z wagami użytkownika dla
   nawierzchni, widoków, bezpieczeństwa, ruchu i parkingów. Rank 1 to trasa wg wag, rank 2 najszybsza.
-  Szczegóły i definicje pól: [docs/ROUTING_GRAPH.md](../docs/ROUTING_GRAPH.md).
-- Opcjonalne `via` (do 5 punktów pośrednich, w kolejności) działa dla wszystkich profili; pole nie jest jeszcze w kontrakcie.
-- Piesi: OpenRouteService (`routing/providers.py`) albo mock bez klucza; ocena tras po przykładowych segmentach.
+  Szczegóły i definicje pól: [docs/ROUTING_GRAPH.md](../docs/ROUTING_GRAPH.md). Piesi chodzą po drogach (nie po chodnikach).
+  Zewnętrznego silnika tras (ORS) i mocka już nie ma; zmienne `ROUTING_PROVIDER` i `ORS_API_KEY` są nieużywane.
+- Opcjonalne `via` (do 5 punktów pośrednich, w kolejności) działa dla wszystkich profili.
+- Opcjonalne `time_of_day` (`morning|day|evening|night`, domyślnie aktualna pora w Warszawie): trasa i pokazane oceny
+  liczą oceny z tej pory (zmieszane z ocenami ogólnymi).
+- Przeszkody (`app/obstacles.py`): `GET /obstacles?bbox=`, `POST /obstacles` (10/h), `DELETE /admin/obstacles/{id}`.
+  Aktywne przeszkody zmieniają trasy auta, roweru i pieszych na żywo (zamknięcie blokuje krawędź, reszta wydłuża czas).
 - Limit 30 żądań/min na IP; punkt poza obsługiwanym obszarem 422; punkt dalej niż 600 m od drogi 404.
 - Testy: `tests/test_graph_routing.py` (offline) i `tests/test_graph_db.py` (opcjonalnie, `RUN_DB_TESTS=1`,
   prawdziwa baza, tylko odczyty).

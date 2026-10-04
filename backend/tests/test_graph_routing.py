@@ -4,6 +4,8 @@ the real database by test_graph_db.py (opt-in)."""
 
 from contextlib import contextmanager
 
+from datetime import datetime, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -37,13 +39,15 @@ class FakeGraph:
         self.paths = [weighted] + ([fastest] if fastest is not None else [])
         self.snap_m = snap
         self.calls = []
+        self.times = []  # the time of day of every find() call
 
     def snap(self, profile, point):
         # distinct points snap to distinct nodes, identical points to the same one
         return None if self.snap_m is None else Snap(hash((point.lat, point.lon)), self.snap_m)
 
-    def find(self, profile, legs, variants):
+    def find(self, profile, legs, variants, time_of_day=None):
         self.calls.append((profile, legs, variants))
+        self.times.append(time_of_day)
         return self.paths[: len(variants)]
 
 
@@ -172,10 +176,17 @@ def test_empty_path_is_not_found():
     assert (err.value.status, err.value.code) == (404, "NOT_FOUND")
 
 
-def test_graph_refuses_a_walking_profile():
+def test_graph_refuses_an_unknown_profile():
     with pytest.raises(AppError) as err:
-        graph_routes(FakeGraph(FAST), "foot-walking", Point(**RYNEK), Point(**PODGORZE), Weights())
+        graph_routes(FakeGraph(FAST), "flying-carpet", Point(**RYNEK), Point(**PODGORZE), Weights())
     assert err.value.status == 422
+
+
+@pytest.mark.parametrize("profile", ["driving-car", "cycling-regular", "foot-walking"])
+def test_every_profile_is_served_from_the_graph(profile):
+    graph = FakeGraph(FAST)
+    routes = graph_routes(graph, profile, Point(**RYNEK), Point(**PODGORZE), Weights())
+    assert len(routes) == 1 and graph.calls[0][0] == profile
 
 
 # --- endpoint --------------------------------------------------------------------------------------------------
@@ -231,42 +242,77 @@ def test_too_many_via_stops_are_rejected():
     assert res.status_code == 422 and res.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
-def test_pedestrian_route_goes_through_the_via_stops():
+def test_pedestrian_route_with_via_is_built_from_legs_like_the_other_profiles():
+    graph = use(FakeGraph(SCENIC, FAST))
     res = client.post("/api/v1/route", json={**FRONTEND_REQUEST, "profile": "foot-walking"})
     assert res.status_code == 200
-    routes = res.json()["routes"]
-    assert len(routes) == 1  # a route with stops is a single route
-    assert [19.93070285958069, 50.06549504004241] in routes[0]["geometry"]["coordinates"]
+    assert [r["rank"] for r in res.json()["routes"]] == [1, 2]  # same behaviour as cars and bikes
+    profile, legs, variants = graph.calls[0]
+    assert profile == "foot-walking" and len(legs) == 2
 
 
-def test_endpoint_serves_bikes_from_the_graph_too():
+@pytest.mark.parametrize("profile", ["driving-car", "cycling-regular", "foot-walking"])
+def test_endpoint_serves_every_profile_from_the_graph(profile):
     graph = use(FakeGraph(FAST))
-    assert route(profile="cycling-regular").status_code == 200
-    assert graph.calls[0][0] == "cycling-regular"
+    assert route(profile=profile).status_code == 200
+    assert graph.calls[0][0] == profile
 
 
-def test_pedestrians_do_not_touch_the_graph():
-    graph = use(FakeGraph(FAST))
-    res = route(profile="foot-walking")
-    assert res.status_code == 200 and graph.calls == []
-    assert len(res.json()["routes"]) == 3  # mock provider's alternatives
-
-
-def test_pedestrians_work_without_a_database():
-    assert route(profile="foot-walking").status_code == 200  # no graph override, no pool
-
-
-def test_cars_without_database_configuration_get_a_clean_error():
-    res = route()  # default dependency: the application has no pool in tests
+@pytest.mark.parametrize("profile", ["driving-car", "cycling-regular", "foot-walking"])
+def test_without_database_configuration_every_profile_gets_a_clean_error(profile):
+    res = route(profile=profile)  # default dependency: the application has no pool in tests
     assert res.status_code == 500
     assert res.json()["error"]["code"] == "INTERNAL_ERROR"
 
 
-def test_outside_krakow_is_rejected_before_the_graph_is_used():
+@pytest.mark.parametrize("field", ["from", "to"])
+def test_point_outside_the_service_area_is_rejected_before_the_graph_is_used(field):
     graph = use(FakeGraph(FAST))
-    res = route(**{"to": {"lat": 52.23, "lon": 21.01}})
+    res = route(**{field: {"lat": 52.23, "lon": 21.01}})  # Warsaw
     assert res.status_code == 422 and res.json()["error"]["code"] == "OUT_OF_AREA"
+    assert res.json()["error"]["details"]["field"] == field
     assert graph.calls == []
+
+
+@pytest.mark.parametrize("band", ["morning", "day", "evening", "night"])
+def test_time_of_day_is_passed_to_the_graph(band):
+    graph = use(FakeGraph(FAST))
+    assert route(time_of_day=band).status_code == 200
+    assert graph.times == [band]
+
+
+@pytest.mark.parametrize("hour_utc,expected", [(3, "night"), (6, "morning"), (10, "day"), (16, "evening"), (21, "night")])
+def test_without_a_time_of_day_the_current_one_in_warsaw_is_used(monkeypatch, hour_utc, expected):
+    import app.routing.router as router_module
+
+    class Frozen(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 5, hour_utc, 30, tzinfo=timezone.utc)  # Warsaw is UTC+2 in October
+
+    monkeypatch.setattr(router_module, "datetime", Frozen)
+    graph = use(FakeGraph(FAST))
+    assert route().status_code == 200
+    assert graph.times == [expected]
+
+
+@pytest.mark.parametrize("band", ["afternoon", "", 5])
+def test_unknown_time_of_day_is_rejected(band):
+    graph = use(FakeGraph(FAST))
+    res = route(time_of_day=band)
+    assert res.status_code == 422 and res.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert graph.calls == []
+
+
+def test_weight_above_three_is_rejected():
+    use(FakeGraph(FAST))
+    res = route({"surface": 4})
+    assert res.status_code == 422 and res.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_unknown_profile_is_rejected():
+    use(FakeGraph(FAST))
+    assert route(profile="flying-carpet").status_code == 422
 
 
 def test_route_limit_is_30_per_minute_per_ip():
@@ -326,7 +372,7 @@ def test_postgres_source_maps_rows_and_scores():
 
     assert source.snap("driving-car", Point(**RYNEK)) == Snap(77, 12.5)
     paths = source.find("driving-car", [(Point(**RYNEK), Point(**PODGORZE))],
-                        [Weights(surface=2, traffic=1), Weights()])
+                        [Weights(surface=2, traffic=1), Weights()], "night")
 
     assert len(paths) == 2 and [s.edge_id for s in paths[0]] == [10, 11]
     assert paths[0][0].scores["surface"] == 4.5 and paths[0][0].scores["views"] is None
@@ -334,9 +380,10 @@ def test_postgres_source_maps_rows_and_scores():
     assert paths[0][0].rated and not paths[0][1].rated
     find_calls = [p for sql, p in conn.executed if "find_route" in sql]
     assert find_calls[0] == {"profile": "driving-car", "from_lon": 19.9373, "from_lat": 50.0617, "to_lon": 19.944,
-                             "to_lat": 50.047, "surface": 2, "views": 0, "safety": 0, "traffic": 1, "parking": 0}
+                             "to_lat": 50.047, "surface": 2, "views": 0, "safety": 0, "traffic": 1, "parking": 0,
+                             "time_of_day": "night"}
     score_calls = [p for sql, p in conn.executed if "segment_scores" in sql]
-    assert score_calls == [([100, 101],)]  # one query for both variants, each segment once
+    assert score_calls == [("night", [100, 101])]  # one query for both variants, each segment once, same time of day
 
 
 def test_postgres_source_without_pool_raises_a_clean_error():
@@ -387,5 +434,4 @@ class HealthConnection:
 )
 def test_routing_health_requires_a_built_graph(monkeypatch, pool, expected):
     monkeypatch.setattr(app.state, "db_pool", pool, raising=False)
-    monkeypatch.setattr(main.settings, "routing_provider", "mock")
     assert main._check_routing() == expected

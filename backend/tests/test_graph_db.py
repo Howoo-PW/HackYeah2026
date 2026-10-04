@@ -51,7 +51,30 @@ def test_route_through_a_via_stop_passes_near_it(source):
     assert nearest ** 0.5 < MAX_SNAP_M
 
 
-@pytest.mark.parametrize("profile", ["driving-car", "cycling-regular"])
+WAWEL = Point(lat=50.0540, lon=19.9353)
+
+
+def test_pedestrians_reach_the_old_town_where_cars_cannot(source):
+    foot, car = source.snap("foot-walking", RYNEK), source.snap("driving-car", RYNEK)
+    assert foot.distance_m < 100 < car.distance_m  # pedestrian streets belong to the foot network only
+
+
+def test_walk_from_the_market_square_to_wawel(source):
+    route = graph_routes(source, "foot-walking", RYNEK, WAWEL, Weights())[0]
+    assert 1_000 < route.distance_m < 2_500  # straight line is ~0.9 km
+    assert 10 * 60 < route.duration_s < 30 * 60  # walking pace, ~5 km/h
+    assert route.geometry.coordinates[0] != route.geometry.coordinates[-1]
+
+
+def test_walking_priorities_change_the_route_and_rank_the_fastest_second(source):
+    routes = graph_routes(source, "foot-walking", FAR_EAST, FAR_WEST, Weights(traffic=3))
+    assert [r.rank for r in routes] == [1, 2]
+    calm, fastest = routes
+    assert calm.geometry.coordinates != fastest.geometry.coordinates
+    assert fastest.duration_s <= calm.duration_s < fastest.duration_s * 2  # a calmer walk, not an absurd detour
+
+
+@pytest.mark.parametrize("profile", ["driving-car", "cycling-regular", "foot-walking"])
 def test_fastest_route_is_connected_and_plausible(source, profile):
     routes = graph_routes(source, profile, FAR_EAST, FAR_WEST, Weights())
     assert len(routes) == 1
@@ -105,6 +128,12 @@ def test_endpoint_and_health_with_the_real_pool():
         assert frontend.status_code == 200, frontend.text
         assert frontend.json()["routes"][0]["rank"] == 1
 
+        walk = client.post("/api/v1/route", json={
+            "from": RYNEK.model_dump(), "to": WAWEL.model_dump(), "profile": "foot-walking", "weights": {"traffic": 2},
+        })
+        assert walk.status_code == 200, walk.text
+        assert walk.json()["routes"][0]["rank"] == 1
+
         health = client.get("/api/v1/health").json()
-        assert health["checks"]["routing"] in ("ok", "not_configured")  # not_configured: no ORS key (pedestrians)
+        assert health["checks"]["routing"] == "ok"  # the graph is built for cars, bikes and pedestrians
         assert health["checks"]["database"] == "ok"

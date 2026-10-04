@@ -13,6 +13,7 @@ from .config import settings
 from .core import router as core_router
 from .database import create_pool
 from .errors import install_error_handlers
+from .obstacles import router as obstacles_router
 from .rate_limit import RedisRateLimiter
 from .routing.router import router as routing_router
 
@@ -48,6 +49,7 @@ app.add_middleware(
 
 api = APIRouter(prefix="/api/v1")
 api.include_router(core_router)
+api.include_router(obstacles_router)
 api.include_router(routing_router)
 
 
@@ -82,20 +84,20 @@ def _check_database() -> str:
 
 
 def _check_routing() -> str:
-    """Own graph (cars, bikes) must be built; pedestrians need ORS configured. No call to ORS here: free plan quota."""
+    """The own graph must be built for all three profiles (cars, bikes, pedestrians)."""
     pool = app.state.db_pool
     if pool is None:
         return "not_configured"
     try:
         with pool.connection() as conn:
-            row = conn.execute("SELECT EXISTS(SELECT 1 FROM public.routing_graph) AS ready").fetchone()
+            row = conn.execute("""
+                SELECT EXISTS(SELECT 1 FROM public.routing_graph WHERE car_dir <> 'none')
+                   AND EXISTS(SELECT 1 FROM public.routing_graph WHERE bike_dir <> 'none')
+                   AND EXISTS(SELECT 1 FROM public.routing_graph WHERE foot_dir <> 'none') AS ready
+            """).fetchone()
     except Exception:
         return "error"
-    if not row["ready"]:
-        return "error"
-    if settings.routing_provider == "ors":
-        return "ok" if settings.ors_api_key.get_secret_value() else "not_configured"
-    return "ok"  # mock provider for pedestrians
+    return "ok" if row["ready"] else "error"
 
 
 @api.get("/health", tags=["system"])
