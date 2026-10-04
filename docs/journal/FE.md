@@ -21,6 +21,17 @@ Najnowsze wpisy na górze. Szablon: [README.md](README.md).
 - To nadal kilka żądań, nie jedna transakcja: przy awarii sieci po ocenie komentarz lub zdjęcie mogą się nie zmienić (użytkownik może ponowić).
 - Nie sprawdzone w przeglądarce z prawdziwym logowaniem.
 
+## 2026-10-04 — Beata — gałąź `fix/gps`
+
+**Zadanie:** lokalizacja (GPS) nie działała.
+
+**Zrobione:**
+- `lib/geolocation.ts`: `locateUser()` najpierw szybki odczyt z sieci (bez wysokiej dokładności, 15 s, odczyt do minuty wstecz), potem wysoka dokładność; polskie komunikaty błędów (zgoda, brak położenia w systemie, czas, brak HTTPS), kontrola obszaru Krakowa.
+- „Moja lokalizacja” w `RoutePanel` używa `locateUser()`; przycisk lokalizacji na mapie (`GeolocateControl`) ma te same opcje i pokazuje komunikat nad mapą przy błędzie lub pozycji poza Krakowem.
+
+**Dalej / blokery:**
+- Nie sprawdzone w przeglądarce z prawdziwą lokalizacją; lokalizacja wymaga HTTPS lub localhost.
+
 ## 2026-10-04 — Beata — gałąź `feature/ai-assistant` (poprawki asystenta, seed Wisły)
 
 **Zrobione:**

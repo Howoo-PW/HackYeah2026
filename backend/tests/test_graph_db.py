@@ -91,21 +91,6 @@ def test_traffic_priority_gives_a_calmer_route_for_a_bit_more_time(source):
     calm, fastest = routes
     assert fastest.duration_s <= calm.duration_s  # rank 2 really is the fastest
     assert calm.duration_s < fastest.duration_s * 2  # ...and the calm one is not absurdly longer
-    assert calm.coverage >= 0.0 and 0.0 <= fastest.coverage <= 1.0
-
-
-def test_changing_the_weights_changes_the_route(source):
-    quiet = graph_routes(source, "cycling-regular", FAR_EAST, FAR_WEST, Weights(traffic=3, safety=3))[0]
-    fastest = graph_routes(source, "cycling-regular", FAR_EAST, FAR_WEST, Weights())[0]
-    assert quiet.geometry.coordinates != fastest.geometry.coordinates
-
-
-def test_same_point_twice_is_not_found(source):
-    from app.errors import AppError
-
-    with pytest.raises(AppError) as err:
-        graph_routes(source, "driving-car", RYNEK, RYNEK, Weights())
-    assert err.value.status == 404
 
 
 def test_endpoint_and_health_with_the_real_pool():

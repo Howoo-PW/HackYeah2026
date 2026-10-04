@@ -10,6 +10,7 @@ import { OPINIONS_CHANGED } from '../api/client'
 import { SEGMENT_ZOOM, useMapData } from '../map/useMapData'
 import type { Bbox, LatLon, Place } from '../api/types'
 import { KRAKOW_BBOX, KRAKOW_CENTER, NO_DATA_COLOR, SCORE_COLORS, metricScore } from '../lib/dimensions'
+import { OUTSIDE_AREA_TEXT, geolocationErrorText, inServiceArea } from '../lib/geolocation'
 import type { Metric } from '../lib/dimensions'
 import type { PointKey } from '../routing/useRouteDraft'
 import type { SegmentFilter } from '../api/client'
@@ -133,6 +134,8 @@ export default function MapView({ routes, basemap, dimension, filter, only, sele
   const mapRef = useRef<MapRef>(null)
   const [bbox, setBbox] = useState<Bbox | null>(null)
   const [zoom, setZoom] = useState(13)
+  /** Why the location button did not work (shown over the map until it is dismissed or a lookup succeeds). */
+  const [gpsMessage, setGpsMessage] = useState<string | null>(null)
   const [styleInfo, setStyleInfo] = useState<StyleInfo | null>(null)
   const originalVisibility = useRef<Record<string, string>>({})
 
@@ -281,7 +284,15 @@ export default function MapView({ routes, basemap, dimension, filter, only, sele
       cursor={routeMode && placing ? 'crosshair' : 'auto'}
     >
       <NavigationControl position="bottom-right" showCompass={false} />
-      <GeolocateControl position="bottom-right" showAccuracyCircle={false} fitBoundsOptions={{ maxZoom: 16 }} />
+      <GeolocateControl
+        position="bottom-right"
+        showAccuracyCircle={false}
+        fitBoundsOptions={{ maxZoom: 16 }}
+        // Low accuracy first: computers without GPS often time out when high accuracy is demanded.
+        positionOptions={{ enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }}
+        onGeolocate={(e: GeolocationPosition) => setGpsMessage(inServiceArea(e.coords.latitude, e.coords.longitude) ? null : OUTSIDE_AREA_TEXT)}
+        onError={(e: GeolocationPositionError) => setGpsMessage(geolocationErrorText(e))}
+      />
       {!routeMode &&
         pins.map((pin) => (
           <Marker key={`${pin.label}-${pin.lat}-${pin.lon}`} longitude={pin.lon} latitude={pin.lat} anchor="bottom">
@@ -392,6 +403,14 @@ export default function MapView({ routes, basemap, dimension, filter, only, sele
             paint={{ 'line-color': ['case', ['get', 'selected'], '#2563eb', '#94a3b8'], 'line-width': ['case', ['get', 'selected'], 7, 4.5] }}
           />
         </Source>
+      )}
+      {gpsMessage && (
+        <div role="alert" className="pointer-events-auto absolute bottom-6 left-1/2 z-20 flex w-[min(24rem,calc(100%-6rem))] -translate-x-1/2 items-start gap-2 rounded-xl bg-amber-100 px-3 py-2 text-sm text-amber-900 shadow-lg">
+          <span className="min-w-0 flex-1">{gpsMessage}</span>
+          <button onClick={() => setGpsMessage(null)} aria-label="Zamknij komunikat" className="rounded-full px-1.5 hover:bg-amber-200">
+            ✕
+          </button>
+        </div>
       )}
     </Map>
   )

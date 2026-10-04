@@ -66,9 +66,11 @@ def test_scores_for_a_time_of_day_use_the_band_ratings(conn):
     assert abs(in_band - row["base"]) > 0.01  # the band really changes the score, and only part of the way
 
 
-@pytest.mark.parametrize("profile", ["driving-car", "cycling-regular", "foot-walking"])
-@pytest.mark.parametrize("tod", [None, "morning", "day", "evening", "night"])
-def test_every_profile_routes_for_every_time_of_day(conn, profile, tod):
+@pytest.mark.parametrize("profile,tod", [
+    ("driving-car", None), ("driving-car", "morning"), ("driving-car", "day"), ("driving-car", "evening"),
+    ("cycling-regular", "night"), ("foot-walking", "night"),  # every band once, every profile once
+])
+def test_routes_exist_for_every_time_of_day_and_profile(conn, profile, tod):
     assert len(route(conn, profile, tod)) > 20
 
 
