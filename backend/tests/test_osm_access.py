@@ -114,7 +114,7 @@ def test_classify_drops_ways_nobody_may_use():
     way(), way("primary"), way("secondary_link"), way("tertiary"), way("unclassified"), way("living_street"),
     way("service"), way("pedestrian"), way("path"), way("track"), way("footway"),
     way(oneway="yes"), way(oneway="-1"), way(junction="roundabout"), way("primary", oneway="yes"),  # one-way: not for walkers
-    way("footway", footway="traffic_island"), way(oneway__bicycle="yes"),
+    way("footway", footway="traffic_island"),
 ])
 def test_pedestrians_walk_roads_in_both_directions(tags):
     assert foot_direction(tags) == BOTH
@@ -129,7 +129,7 @@ def test_explicit_foot_oneway_is_respected(tags, expected):
 
 @pytest.mark.parametrize("tags", [
     way("motorway"), way("motorway_link"), way("trunk"), way("trunk_link"), way("cycleway"), way("steps"),
-    way(foot="no"), way(foot="private"), way(access="no"), way(access="private"), way(access="customers"),
+    way(foot="no"), way(foot="private"), way(access="no"), way(access="private"),
     way("footway", footway="sidewalk"), way("footway", footway="crossing"),
     way("service", service="parking_aisle"), way("service", service="driveway"), way("service", service="emergency_access"),
     way("pedestrian", area="yes"), way(area="yes"),

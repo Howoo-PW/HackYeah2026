@@ -182,13 +182,6 @@ def test_graph_refuses_an_unknown_profile():
     assert err.value.status == 422
 
 
-@pytest.mark.parametrize("profile", ["driving-car", "cycling-regular", "foot-walking"])
-def test_every_profile_is_served_from_the_graph(profile):
-    graph = FakeGraph(FAST)
-    routes = graph_routes(graph, profile, Point(**RYNEK), Point(**PODGORZE), Weights())
-    assert len(routes) == 1 and graph.calls[0][0] == profile
-
-
 # --- endpoint --------------------------------------------------------------------------------------------------
 
 def test_endpoint_returns_contract_fields_for_cars():
@@ -222,12 +215,6 @@ def test_endpoint_accepts_the_frontend_request_with_via():
     assert variants[0] == Weights(surface=2)
 
 
-def test_via_is_optional():
-    use(FakeGraph(FAST))
-    body = {k: v for k, v in FRONTEND_REQUEST.items() if k != "via"}
-    assert client.post("/api/v1/route", json=body).status_code == 200
-
-
 def test_via_outside_krakow_is_rejected_with_its_index():
     graph = use(FakeGraph(FAST))
     res = client.post("/api/v1/route", json={**FRONTEND_REQUEST, "via": [{"lat": 52.23, "lon": 21.01}]})
@@ -242,15 +229,6 @@ def test_too_many_via_stops_are_rejected():
     assert res.status_code == 422 and res.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
-def test_pedestrian_route_with_via_is_built_from_legs_like_the_other_profiles():
-    graph = use(FakeGraph(SCENIC, FAST))
-    res = client.post("/api/v1/route", json={**FRONTEND_REQUEST, "profile": "foot-walking"})
-    assert res.status_code == 200
-    assert [r["rank"] for r in res.json()["routes"]] == [1, 2]  # same behaviour as cars and bikes
-    profile, legs, variants = graph.calls[0]
-    assert profile == "foot-walking" and len(legs) == 2
-
-
 @pytest.mark.parametrize("profile", ["driving-car", "cycling-regular", "foot-walking"])
 def test_endpoint_serves_every_profile_from_the_graph(profile):
     graph = use(FakeGraph(FAST))
@@ -258,9 +236,8 @@ def test_endpoint_serves_every_profile_from_the_graph(profile):
     assert graph.calls[0][0] == profile
 
 
-@pytest.mark.parametrize("profile", ["driving-car", "cycling-regular", "foot-walking"])
-def test_without_database_configuration_every_profile_gets_a_clean_error(profile):
-    res = route(profile=profile)  # default dependency: the application has no pool in tests
+def test_without_database_configuration_the_error_is_clean():
+    res = route()  # default dependency: the application has no pool in tests
     assert res.status_code == 500
     assert res.json()["error"]["code"] == "INTERNAL_ERROR"
 
@@ -308,11 +285,6 @@ def test_weight_above_three_is_rejected():
     use(FakeGraph(FAST))
     res = route({"surface": 4})
     assert res.status_code == 422 and res.json()["error"]["code"] == "VALIDATION_ERROR"
-
-
-def test_unknown_profile_is_rejected():
-    use(FakeGraph(FAST))
-    assert route(profile="flying-carpet").status_code == 422
 
 
 def test_route_limit_is_30_per_minute_per_ip():

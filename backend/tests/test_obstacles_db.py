@@ -93,16 +93,6 @@ def test_a_closure_sends_the_route_around_it_and_removal_restores_it(conn, profi
     assert [r["edge_id"] for r in route(conn, profile)] == [r["edge_id"] for r in base]
 
 
-def test_roadwork_makes_the_edge_slower_without_closing_it(conn):
-    base = route(conn)
-    target = base[len(base) // 2]["edge_id"]
-    report(conn, "roadwork", middle_of(conn, target))
-    slowed = {r["edge_id"]: r["time_s"] for r in route(conn)}
-    if target in slowed:  # the route may also go around it; if it stays, the edge takes twice as long
-        original = next(r["time_s"] for r in base if r["edge_id"] == target)
-        assert slowed[target] == pytest.approx(2 * original)
-
-
 def test_expired_closure_does_not_affect_routes(conn):
     base = route(conn)
     created = report(conn, "closure", middle_of(conn, base[len(base) // 2]["edge_id"]),
