@@ -24,7 +24,7 @@ type Status = { mock: boolean; error: string | null; zoomedOut: boolean; loading
 export default function App() {
   const [basemap, setBasemap] = useState<Basemap>(() => (new URLSearchParams(window.location.search).get('basemap') === 'satellite' ? 'satellite' : 'map'))
   const [dimension, setDimension] = useState<Metric>('overall')
-  const [filter, setFilter] = useState<SegmentFilter>({ dimension: null, minScore: null, ratedOnly: false, noObstacles: false })
+  const [filter, setFilter] = useState<SegmentFilter>({ dimension: null, minScore: null, noObstacles: false })
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   // Segments of the street stretch (group) of the selected piece, once the panel has loaded it.
@@ -119,13 +119,13 @@ export default function App() {
                 aria-expanded={filtersOpen}
                 className="rounded-full bg-white px-4 py-2 text-sm font-medium shadow-lg ring-1 ring-black/5 transition hover:bg-gray-50"
               >
-                ⚙ Filtry i kolory
+                Filtry i kolory
               </button>
               <button
                 onClick={() => startRoute()}
                 className="rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-lg transition hover:bg-gray-700"
               >
-                🧭 Trasa
+                Trasa
               </button>
             </div>
 

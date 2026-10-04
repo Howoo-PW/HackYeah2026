@@ -38,7 +38,6 @@ export type SegmentFilter = {
   /** Metric the min score applies to. `overall` is filtered on the client (contract only filters by one dimension). */
   dimension: Metric | null
   minScore: number | null
-  ratedOnly: boolean
   /** Client-side only: the contract has no query parameter for it, so we drop segments with active obstacles. */
   noObstacles: boolean
 }
@@ -54,7 +53,6 @@ export async function fetchSegments(bbox: Bbox, filter: SegmentFilter, signal?: 
       params.set('dimension', filter.dimension)
       params.set('min_score', String(filter.minScore))
     }
-    if (filter.ratedOnly) params.set('rated_only', 'true')
     try {
       const data = await request<SegmentCollection>(`/segments?${params}`, signal)
       return { data: clientFilter(data, filter), mock: false }
@@ -76,7 +74,6 @@ export async function fetchGroupMap(bbox: Bbox, filter: SegmentFilter, signal?: 
     params.set('dimension', filter.dimension)
     params.set('min_score', String(filter.minScore))
   }
-  if (filter.ratedOnly) params.set('rated_only', 'true')
   return request<GroupMapCollection>(`/groups?${params}`, signal)
 }
 
@@ -123,11 +120,10 @@ export async function fetchComments(id: number, page: number, pageSize: number, 
   return mockComments(id, page, pageSize)
 }
 
-/** Mock stand-in for the server-side filters (rated_only, dimension + min_score) plus the client-side ones. */
+/** Mock stand-in for the server-side filter (dimension + min_score) plus the client-side ones. */
 function applyMockFilter(data: SegmentCollection, filter: SegmentFilter): SegmentCollection {
-  const { dimension, minScore, ratedOnly } = filter
+  const { dimension, minScore } = filter
   const features = clientFilter(data, filter).features.filter((f) => {
-    if (ratedOnly && f.properties.ratings_count === 0) return false
     if (dimension && dimension !== 'overall' && minScore !== null) {
       const v = f.properties.scores[dimension]
       return v !== null && v >= minScore
